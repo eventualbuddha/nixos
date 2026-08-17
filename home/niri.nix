@@ -41,6 +41,7 @@ in
     pkgs.wf-recorder
     pkgs.libnotify
     pkgs.wl-clipboard
+    pkgs.wtype # virtual-keyboard text injection, used by the em dash bind below
   ];
 
   programs.niri = {
@@ -165,6 +166,12 @@ in
         # Grow/shrink the focused column horizontally.
         "Mod+Minus".action.set-column-width = "-10%";
         "Mod+Equal".action.set-column-width = "+10%";
+
+        # macOS-style em dash. This is a global bind that injects the
+        # character via a virtual keyboard (wtype), not real xkb-level
+        # input -- Alt+Minus is swallowed entirely and never reaches the
+        # focused app as a keypress.
+        "Alt+Minus".action.spawn = [ "wtype" "—" ];
 
         # macOS-style screenshot triad, all on the actual Print Screen key
         # instead of Super+Shift+3/4/5 (freed up below for move-to-workspace).
