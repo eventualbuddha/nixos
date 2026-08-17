@@ -33,15 +33,34 @@ let
   gnomeSettings = pkgs.writeShellScriptBin "gnome-settings" ''
     exec env XDG_CURRENT_DESKTOP=GNOME ${pkgs.gnome-control-center}/bin/gnome-control-center "$@"
   '';
+
+  # macOS-style universal copy. Ctrl+C means "copy" almost everywhere, but
+  # terminals reserve it for SIGINT and use Ctrl+Shift+C for copy instead --
+  # so this checks the focused window's app-id and injects the right combo.
+  # Add more app-ids to the terminal case as you add more terminal emulators.
+  modCopy = pkgs.writeShellScriptBin "mod-copy" ''
+    set -euo pipefail
+    app_id=$(${pkgs.niri}/bin/niri msg --json focused-window | ${pkgs.jq}/bin/jq -r '.app_id // empty')
+    case "$app_id" in
+      com.mitchellh.ghostty)
+        ${pkgs.wtype}/bin/wtype -M ctrl -M shift -k c -m shift -m ctrl
+        ;;
+      *)
+        ${pkgs.wtype}/bin/wtype -M ctrl -k c -m ctrl
+        ;;
+    esac
+  '';
 in
 {
   home.packages = [
     screenRecordToggle
     gnomeSettings
+    modCopy
     pkgs.wf-recorder
     pkgs.libnotify
     pkgs.wl-clipboard
-    pkgs.wtype # virtual-keyboard text injection, used by the em dash bind below
+    pkgs.wtype # virtual-keyboard text injection, used by mod-copy and the em dash bind
+    pkgs.jq # used by mod-copy to read niri's focused-window JSON
   ];
 
   programs.niri = {
@@ -148,6 +167,7 @@ in
         "Mod+Space".action.spawn = [ "noctalia" "msg" "panel-toggle" "launcher" ];
         "Mod+Ctrl+L".action.spawn = [ "noctalia" "msg" "session" "lock" ];
         "Mod+V".action.spawn = [ "noctalia" "msg" "panel-toggle" "clipboard" ];
+        "Mod+C".action.spawn = [ "mod-copy" ]; # macOS-style copy, any app
         # Confirm-with-countdown logout/power panel (noctalia's own session UI).
         "Mod+Shift+Q".action.spawn = [ "noctalia" "msg" "panel-toggle" "session" ];
 
