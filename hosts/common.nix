@@ -30,8 +30,14 @@
     LC_NUMERIC = "en_US.UTF-8";
     LC_PAPER = "en_US.UTF-8";
     LC_TELEPHONE = "en_US.UTF-8";
-    LC_TIME = "en_US.UTF-8";
+    # en_DK is the standard trick for "Monday-first week, sane date order"
+    # without switching to British DD/MM formatting -- it also switches date
+    # *formatting* to ISO-ish YYYY-MM-DD as a side effect. Best effort: which
+    # apps actually honor this (vs. their own GSetting/config) varies.
+    LC_TIME = "en_DK.UTF-8";
   };
+
+  i18n.supportedLocales = [ "en_US.UTF-8/UTF-8" "en_DK.UTF-8/UTF-8" ];
 
   # Enable the X11 windowing system.
   services.xserver.enable = true;

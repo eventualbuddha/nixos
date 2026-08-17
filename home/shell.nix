@@ -3,6 +3,9 @@
 {
   programs.fish = {
     enable = true;
+    interactiveShellInit = ''
+      set -g fish_greeting
+    '';
     shellAliases = {
       ls = "eza --icons --group-directories-first";
       ll = "eza -l --icons --group-directories-first";

@@ -18,8 +18,46 @@
       volume.show_label = false;
       battery.show_label = false;
       bluetooth.show_label = false;
+      brightness.show_label = false;
       workspaces.show_labels = false;
       media.album_art_only = true;
+      clock.format = "{:%I:%M %p}"; # 12-hour
+    };
+
+    # Add `weather` to the default right-side widget list (it isn't there by
+    # default even with the weather service enabled below).
+    bar.end_widgets = [
+      "media"
+      "weather"
+      "tray"
+      "notifications"
+      "clipboard"
+      "network"
+      "bluetooth"
+      "volume"
+      "brightness"
+      "battery"
+      "control-center"
+      "session"
+    ];
+
+    # IP-based geolocation, feeding both the weather widget and night light.
+    location.auto_locate = true;
+    weather = {
+      enabled = true;
+      unit = "imperial";
+    };
+
+    # Wallpaper rotation from whatever you drop in ~/Pictures/Wallpapers
+    # (noctalia's default directory when unset -- set explicitly here anyway).
+    wallpaper = {
+      directory = "/home/brian/Pictures/Wallpapers";
+      automation = {
+        enabled = true;
+        interval_seconds = 1800; # 30 min
+        order = "random";
+        recursive = true;
+      };
     };
   };
 }
