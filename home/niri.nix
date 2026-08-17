@@ -24,12 +24,23 @@ let
       ${pkgs.libnotify}/bin/notify-send "Screen recording" "Started: $OUT"
     fi
   '';
+
+  # gnome-control-center hard-exits unless XDG_CURRENT_DESKTOP says GNOME/Unity
+  # (it is under niri, correctly). This wrapper overrides just its own view of
+  # that variable so panels like Online Accounts still work when launched
+  # directly; apps that deep-link into it (e.g. GNOME Calendar's "Online
+  # Account Settings" button) don't go through this and will still no-op.
+  gnomeSettings = pkgs.writeShellScriptBin "gnome-settings" ''
+    exec env XDG_CURRENT_DESKTOP=GNOME ${pkgs.gnome-control-center}/bin/gnome-control-center "$@"
+  '';
 in
 {
   home.packages = [
     screenRecordToggle
+    gnomeSettings
     pkgs.wf-recorder
     pkgs.libnotify
+    pkgs.wl-clipboard
   ];
 
   programs.niri = {
