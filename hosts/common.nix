@@ -57,6 +57,11 @@
   programs.niri.enable = true;
   programs.niri.package = pkgs.niri;
 
+  # Flatpak, for apps not in nixpkgs (e.g. Fastmail's Flathub build). A
+  # second, non-declarative package manager living alongside everything
+  # else here -- used only for the handful of things that need it.
+  services.flatpak.enable = true;
+
   # 1Password (CLI + GUI, with polkit/browser-integration wrappers).
   programs._1password.enable = true;
   programs._1password-gui = {

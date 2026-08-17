@@ -19,7 +19,6 @@
   home.packages = with pkgs; [
     vesktop
     pear-desktop # formerly `youtube-music`
-    evolution # mail client; auto-uses the GNOME Online Accounts config
     yazi
     btop
     fastfetch
