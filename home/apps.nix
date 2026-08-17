@@ -20,7 +20,6 @@
     vesktop
     pear-desktop # formerly `youtube-music`
     evolution # mail client; auto-uses the GNOME Online Accounts config
-    aerc # TUI mail client, needs its own account setup (~/.config/aerc/accounts.conf)
     yazi
     btop
     fastfetch
