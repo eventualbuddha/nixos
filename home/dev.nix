@@ -71,6 +71,36 @@ in
       enable = true;
       userName = "Brian Donovan";
       userEmail = "brian@donovans.cc";
+
+      # SSH-format signing (git natively supports this since 2.34, GitHub
+      # verifies it since 2022) -- reuses ssh-keygen instead of standing up a
+      # separate GPG keyring. Dedicated YubiKey-resident key (not the
+      # id_ed25519_sk auth key from setup-ssh-yubikey.sh): GitHub treats
+      # "Authentication Key" and "Signing Key" as distinct roles, and a
+      # signing key alone can't be used to log in anywhere, so keeping it
+      # separate limits what a compromised/rotated key affects. Generate it
+      # once, manually (touch required, not something Nix can do):
+      #   ssh-keygen -t ed25519-sk -O resident -f ~/.ssh/id_ed25519_sign_sk \
+      #     -C "brian@donovans.cc (git signing)"
+      # then add the .pub as a *Signing Key* (not Authentication Key) at
+      # https://github.com/settings/keys.
+      signing = {
+        key = "${config.home.homeDirectory}/.ssh/id_ed25519_sign_sk.pub";
+        format = "ssh";
+        signByDefault = true;
+      };
+
+      # Lets `git log --show-signature` verify locally instead of only
+      # trusting GitHub's "Verified" badge. Can't just point this at the
+      # .pub file above -- the allowed_signers format needs a principal
+      # (email) prefixed onto each line, which a plain .pub file doesn't
+      # have. The key material itself is public (it's the same string
+      # you'd paste into GitHub as a Signing Key), so it's fine as literal
+      # text checked into the flake rather than read from disk at eval time.
+      settings.gpg.ssh.allowedSignersFile = "${config.home.homeDirectory}/.config/git/allowed_signers";
     };
   };
+
+  xdg.configFile."git/allowed_signers".text =
+    "brian@donovans.cc sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIPvWKo8q3J1u7QG7CzMoWH8w27wpdlJVUqYI2bme5Zt1AAAABHNzaDo=\n";
 }
