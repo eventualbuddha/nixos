@@ -120,6 +120,21 @@
     ];
   };
 
+  programs.ssh = {
+    extraConfig = ''
+      # VotingWorks VM (Tailscale)
+      Host vx.ts
+        HostName 100.79.161.93
+        Port 2222
+        User vx
+
+      # VotingWorks Desktop (Tailscale)
+      Host vx-host.ts
+        HostName 100.79.161.93
+        User brian
+    '';
+  };
+
   home-manager = {
     useGlobalPkgs = true;
     useUserPackages = true;
