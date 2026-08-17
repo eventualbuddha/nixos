@@ -157,24 +157,75 @@ in
         "Control+Alt+Delete".action.quit = [ ];
 
         # Volume / media, via noctalia's IPC
-        "XF86AudioRaiseVolume".action.spawn = [ "noctalia" "msg" "volume-up" ];
-        "XF86AudioLowerVolume".action.spawn = [ "noctalia" "msg" "volume-down" ];
-        "XF86AudioMute".action.spawn = [ "noctalia" "msg" "volume-mute" ];
-        "XF86AudioPlay".action.spawn = [ "noctalia" "msg" "media" "toggle" ];
-        "XF86AudioNext".action.spawn = [ "noctalia" "msg" "media" "next" ];
-        "XF86AudioPrev".action.spawn = [ "noctalia" "msg" "media" "previous" ];
+        "XF86AudioRaiseVolume".action.spawn = [
+          "noctalia"
+          "msg"
+          "volume-up"
+        ];
+        "XF86AudioLowerVolume".action.spawn = [
+          "noctalia"
+          "msg"
+          "volume-down"
+        ];
+        "XF86AudioMute".action.spawn = [
+          "noctalia"
+          "msg"
+          "volume-mute"
+        ];
+        "XF86AudioPlay".action.spawn = [
+          "noctalia"
+          "msg"
+          "media"
+          "toggle"
+        ];
+        "XF86AudioNext".action.spawn = [
+          "noctalia"
+          "msg"
+          "media"
+          "next"
+        ];
+        "XF86AudioPrev".action.spawn = [
+          "noctalia"
+          "msg"
+          "media"
+          "previous"
+        ];
 
-        "Mod+Space".action.spawn = [ "noctalia" "msg" "panel-toggle" "launcher" ];
-        "Mod+Ctrl+L".action.spawn = [ "noctalia" "msg" "session" "lock" ];
-        "Mod+V".action.spawn = [ "noctalia" "msg" "panel-toggle" "clipboard" ];
+        "Mod+Space".action.spawn = [
+          "noctalia"
+          "msg"
+          "panel-toggle"
+          "launcher"
+        ];
+        "Mod+Ctrl+L".action.spawn = [
+          "noctalia"
+          "msg"
+          "session"
+          "lock"
+        ];
+        "Mod+V".action.spawn = [
+          "noctalia"
+          "msg"
+          "panel-toggle"
+          "clipboard"
+        ];
         "Mod+C".action.spawn = [ "mod-copy" ]; # macOS-style copy, any app
         # Confirm-with-countdown logout/power panel (noctalia's own session UI).
-        "Mod+Shift+Q".action.spawn = [ "noctalia" "msg" "panel-toggle" "session" ];
+        "Mod+Shift+Q".action.spawn = [
+          "noctalia"
+          "msg"
+          "panel-toggle"
+          "session"
+        ];
 
         "Mod+Return".action.spawn = [ "ghostty" ];
         "Mod+B".action.spawn = [ "firefox" ];
         "Mod+E".action.spawn = [ "nautilus" ];
-        "Mod+Shift+E".action.spawn = [ "ghostty" "-e" "yazi" ];
+        "Mod+Shift+E".action.spawn = [
+          "ghostty"
+          "-e"
+          "yazi"
+        ];
 
         "Mod+Q".action.close-window = [ ];
         # Mod+F: maximize within the scrollable layout (leaves gaps/border).
@@ -191,12 +242,17 @@ in
         # character via a virtual keyboard (wtype), not real xkb-level
         # input -- Alt+Minus is swallowed entirely and never reaches the
         # focused app as a keypress.
-        "Alt+Minus".action.spawn = [ "wtype" "—" ];
+        "Alt+Minus".action.spawn = [
+          "wtype"
+          "—"
+        ];
 
         # macOS-style screenshot triad, all on the actual Print Screen key
         # instead of Super+Shift+3/4/5 (freed up below for move-to-workspace).
         "Print".action.screenshot = [ ]; # interactive area select
-        "Shift+Print".action.screenshot-screen = { show-pointer = false; }; # fullscreen
+        "Shift+Print".action.screenshot-screen = {
+          show-pointer = false;
+        }; # fullscreen
         "Ctrl+Print".action.spawn = [ "screen-record-toggle" ]; # toggle recording
 
         "Mod+O".action.toggle-overview = [ ];

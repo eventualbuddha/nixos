@@ -3,15 +3,22 @@
 # ./hardware-configuration.nix, networking.hostName, and any hardware quirks
 # (GPU driver, extra kernel params, etc).
 
-{ config, pkgs, inputs, ... }:
+{
+  config,
+  pkgs,
+  inputs,
+  ...
+}:
 
 {
   # Bootloader.
-  boot.loader.systemd-boot.enable = true;
-  boot.loader.efi.canTouchEfiVariables = true;
+  boot = {
+    loader.systemd-boot.enable = true;
+    loader.efi.canTouchEfiVariables = true;
 
-  # Use latest kernel.
-  boot.kernelPackages = pkgs.linuxPackages_latest;
+    # Use latest kernel.
+    kernelPackages = pkgs.linuxPackages_latest;
+  };
 
   networking.networkmanager.enable = true;
 
@@ -37,7 +44,10 @@
     LC_TIME = "en_DK.UTF-8";
   };
 
-  i18n.supportedLocales = [ "en_US.UTF-8/UTF-8" "en_DK.UTF-8/UTF-8" ];
+  i18n.supportedLocales = [
+    "en_US.UTF-8/UTF-8"
+    "en_DK.UTF-8/UTF-8"
+  ];
 
   # Enable the X11 windowing system.
   services.xserver.enable = true;
@@ -113,7 +123,11 @@
   users.users."brian" = {
     isNormalUser = true;
     description = "Brian Donovan";
-    extraGroups = [ "networkmanager" "wheel" "libvirtd" ];
+    extraGroups = [
+      "networkmanager"
+      "wheel"
+      "libvirtd"
+    ];
     shell = pkgs.fish;
     packages = with pkgs; [
       #  thunderbird
@@ -213,5 +227,8 @@
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
   system.stateVersion = "26.05"; # Did you read the comment?
 
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+  nix.settings.experimental-features = [
+    "nix-command"
+    "flakes"
+  ];
 }

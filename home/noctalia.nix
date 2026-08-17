@@ -41,7 +41,12 @@
       # Full default start list (launcher, wallpaper, workspaces) plus
       # weather, tacked onto the left side instead of mixed into the
       # right-hand icon tray.
-      start = [ "launcher" "wallpaper" "workspaces" "weather" ];
+      start = [
+        "launcher"
+        "wallpaper"
+        "workspaces"
+        "weather"
+      ];
       end = [
         "media"
         "tray"

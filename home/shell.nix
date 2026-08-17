@@ -1,4 +1,4 @@
-{ ... }:
+_:
 
 {
   programs.fish = {
@@ -25,6 +25,6 @@
   programs.starship = {
     enable = true;
     enableFishIntegration = true;
-    settings = builtins.fromTOML (builtins.readFile ./starship-gruvbox-rainbow.toml);
+    settings = fromTOML (builtins.readFile ./starship-gruvbox-rainbow.toml);
   };
 }
