@@ -1,16 +1,18 @@
 { pkgs, lib, ... }:
 
 {
-  programs.neovim = {
-    enable = true;
-    defaultEditor = true;
-    extraPackages = with pkgs; [
-      ripgrep
-      fd
-      gcc
-      unzip
-    ];
-  };
+  # Plain package, not `programs.neovim.enable` -- that module unconditionally
+  # writes its own ~/.config/nvim/init.lua (host-provider settings), which
+  # collides with LazyVim owning that same path as a normal mutable config
+  # dir. `home.sessionVariables.EDITOR` (set in home/default.nix) covers what
+  # `defaultEditor` would have given us.
+  home.packages = with pkgs; [
+    neovim
+    ripgrep
+    fd
+    gcc
+    unzip
+  ];
 
   # Bootstrap the official LazyVim starter config, but only if ~/.config/nvim
   # doesn't already exist -- this never clobbers your own edits, and matches

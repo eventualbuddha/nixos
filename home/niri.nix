@@ -112,8 +112,11 @@ in
         }
       ];
 
+      # No manually-spawned polkit agent here: `programs.niri.enable` (niri-flake)
+      # already installs and starts its own (niri-flake-polkit.service, wanted by
+      # niri.service) -- spawning a second one here made both fight over the same
+      # D-Bus name and crash-loop.
       spawn-at-startup = [
-        { command = [ "${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1" ]; }
         { command = [ "noctalia" ]; }
       ];
 

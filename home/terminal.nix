@@ -6,7 +6,7 @@
     settings = {
       font-size = 11;
       font-family = "JetBrainsMono Nerd Font";
-      theme = "catppuccin-mocha";
+      theme = "Catppuccin Mocha";
       window-decoration = false;
     };
   };

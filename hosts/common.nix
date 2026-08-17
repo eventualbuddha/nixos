@@ -100,6 +100,9 @@
     useUserPackages = true;
     extraSpecialArgs = { inherit inputs; };
     users."brian" = import ../home;
+    # Pre-existing dotfiles (e.g. ~/.config/fish/config.fish) get backed up
+    # with this suffix instead of making activation fail outright.
+    backupFileExtension = "backup";
   };
 
   # Install firefox.
