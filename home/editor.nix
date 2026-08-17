@@ -12,6 +12,12 @@
     fd
     gcc
     unzip
+    nixd
+    # statix (lint) and nixfmt (format) -- the lang.nix LazyVim extra wires
+    # nvim-lint/conform.nvim to call these directly, with no Mason install
+    # path for either, so they have to come from here (same as nixd above).
+    statix
+    nixfmt
   ];
 
   # Bootstrap the official LazyVim starter config, but only if ~/.config/nvim
