@@ -145,7 +145,7 @@ in
         "XF86AudioPrev".action.spawn = [ "noctalia" "msg" "media" "previous" ];
 
         "Mod+Space".action.spawn = [ "noctalia" "msg" "panel-toggle" "launcher" ];
-        "Mod+Shift+L".action.spawn = [ "noctalia" "msg" "session" "lock" ];
+        "Mod+Ctrl+L".action.spawn = [ "noctalia" "msg" "session" "lock" ];
         "Mod+V".action.spawn = [ "noctalia" "msg" "panel-toggle" "clipboard" ];
         # Confirm-with-countdown logout/power panel (noctalia's own session UI).
         "Mod+Shift+Q".action.spawn = [ "noctalia" "msg" "panel-toggle" "session" ];
@@ -191,6 +191,13 @@ in
         "Mod+Shift+Right".action.move-column-right = [ ];
         "Mod+Shift+Down".action.move-column-to-workspace-down = [ ];
         "Mod+Shift+Up".action.move-column-to-workspace-up = [ ];
+
+        # vim-style aliases for the above: h/l move the column, j/k reorder
+        # the focused window within its column.
+        "Mod+Shift+H".action.move-column-left = [ ];
+        "Mod+Shift+L".action.move-column-right = [ ];
+        "Mod+Shift+J".action.move-window-down = [ ];
+        "Mod+Shift+K".action.move-window-up = [ ];
 
         "Mod+1".action.focus-workspace = 1;
         "Mod+2".action.focus-workspace = 2;
