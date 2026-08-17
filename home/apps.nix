@@ -31,5 +31,6 @@
     duf # nicer `df`, pairs with dust
     bat # nicer `cat`, syntax highlighting
     procs # nicer `ps`
+    jq # JSON processor
   ];
 }
