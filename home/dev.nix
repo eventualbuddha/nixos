@@ -56,13 +56,21 @@ in
     sessionPath = [ "${config.home.homeDirectory}/.npm-global/bin" ];
   };
 
-  # Per-project toolchain pinning (the NixOS-native analog to mise/proto/volta):
-  # a project's own flake.nix/shell.nix + direnv gives fully reproducible,
-  # per-directory tool versions via the Nix store. `devenv` (cachix/devenv) is a
-  # popular friendlier layer on top of this if you want more mise-like ergonomics
-  # later -- not installed here, easy to add.
-  programs.direnv = {
-    enable = true;
-    nix-direnv.enable = true;
+  programs = {
+    # Per-project toolchain pinning (the NixOS-native analog to mise/proto/volta):
+    # a project's own flake.nix/shell.nix + direnv gives fully reproducible,
+    # per-directory tool versions via the Nix store. `devenv` (cachix/devenv) is a
+    # popular friendlier layer on top of this if you want more mise-like ergonomics
+    # later -- not installed here, easy to add.
+    direnv = {
+      enable = true;
+      nix-direnv.enable = true;
+    };
+
+    git = {
+      enable = true;
+      userName = "Brian Donovan";
+      userEmail = "brian@donovans.cc";
+    };
   };
 }
