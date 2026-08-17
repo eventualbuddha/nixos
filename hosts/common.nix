@@ -67,6 +67,15 @@
   virtualisation.libvirtd.enable = true;
   programs.virt-manager.enable = true;
 
+  # Tailscale. `trustedInterfaces` skips the firewall for anything already
+  # on the tailnet; the UDP port is opened so peers can connect directly
+  # instead of relaying through a DERP server. Authenticating this machine
+  # (`sudo tailscale up`, opens a browser login) is a one-time manual step --
+  # not something to script.
+  services.tailscale.enable = true;
+  networking.firewall.trustedInterfaces = [ "tailscale0" ];
+  networking.firewall.allowedUDPPorts = [ config.services.tailscale.port ];
+
   # 1Password (CLI + GUI, with polkit/browser-integration wrappers).
   programs._1password.enable = true;
   programs._1password-gui = {
