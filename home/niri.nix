@@ -95,10 +95,10 @@ in
         {
           matches = [ { } ];
           geometry-corner-radius = {
-            top-left = 20.0;
-            top-right = 20.0;
-            bottom-left = 20.0;
-            bottom-right = 20.0;
+            top-left = 8.0;
+            top-right = 8.0;
+            bottom-left = 8.0;
+            bottom-right = 8.0;
           };
           clip-to-geometry = true;
         }
@@ -134,7 +134,10 @@ in
         "XF86AudioPrev".action.spawn = [ "noctalia" "msg" "media" "previous" ];
 
         "Mod+Space".action.spawn = [ "noctalia" "msg" "panel-toggle" "launcher" ];
-        "Mod+L".action.spawn = [ "noctalia" "msg" "session" "lock" ];
+        "Mod+Shift+L".action.spawn = [ "noctalia" "msg" "session" "lock" ];
+        "Mod+V".action.spawn = [ "noctalia" "msg" "panel-toggle" "clipboard" ];
+        # Confirm-with-countdown logout/power panel (noctalia's own session UI).
+        "Mod+Shift+Q".action.spawn = [ "noctalia" "msg" "panel-toggle" "session" ];
 
         "Mod+Return".action.spawn = [ "ghostty" ];
         "Mod+B".action.spawn = [ "firefox" ];
@@ -142,17 +145,36 @@ in
         "Mod+Shift+E".action.spawn = [ "ghostty" "-e" "yazi" ];
 
         "Mod+Q".action.close-window = [ ];
-        "Mod+F".action.fullscreen-window = [ ];
+        # Mod+F: maximize within the scrollable layout (leaves gaps/border).
+        # Mod+Shift+F: true fullscreen (hides bar, no gaps/border).
+        "Mod+F".action.maximize-column = [ ];
+        "Mod+Shift+F".action.fullscreen-window = [ ];
         "Mod+Shift+Space".action.toggle-window-floating = [ ];
 
-        "Super+Shift+3".action.screenshot-screen = { show-pointer = false; };
-        "Super+Shift+4".action.screenshot = [ ];
-        "Super+Shift+5".action.spawn = [ "screen-record-toggle" ];
+        # Grow/shrink the focused column horizontally.
+        "Mod+Minus".action.set-column-width = "-10%";
+        "Mod+Equal".action.set-column-width = "+10%";
 
+        # macOS-style screenshot triad, all on the actual Print Screen key
+        # instead of Super+Shift+3/4/5 (freed up below for move-to-workspace).
+        "Print".action.screenshot = [ ]; # interactive area select
+        "Shift+Print".action.screenshot-screen = { show-pointer = false; }; # fullscreen
+        "Ctrl+Print".action.spawn = [ "screen-record-toggle" ]; # toggle recording
+
+        # Arrow keys...
         "Mod+Left".action.focus-column-left = [ ];
         "Mod+Right".action.focus-column-right = [ ];
         "Mod+Down".action.focus-workspace-down = [ ];
         "Mod+Up".action.focus-workspace-up = [ ];
+
+        # ...and vim-style h/j/k/l aliases: h/l move across columns, j/k move
+        # between stacked windows within a column, u/i switch workspaces.
+        "Mod+H".action.focus-column-left = [ ];
+        "Mod+L".action.focus-column-right = [ ];
+        "Mod+J".action.focus-window-down = [ ];
+        "Mod+K".action.focus-window-up = [ ];
+        "Mod+U".action.focus-workspace-down = [ ];
+        "Mod+I".action.focus-workspace-up = [ ];
 
         "Mod+Shift+Left".action.move-column-left = [ ];
         "Mod+Shift+Right".action.move-column-right = [ ];
@@ -165,14 +187,11 @@ in
         "Mod+4".action.focus-workspace = 4;
         "Mod+5".action.focus-workspace = 5;
 
-        # Note: Ctrl+Shift+N here (not Mod+Shift+N) so these never collide with
-        # the Super+Shift+3/4/5 screenshot/recording binds above -- niri's "Mod"
-        # is the Super key by default.
-        "Ctrl+Shift+1".action.move-column-to-workspace = 1;
-        "Ctrl+Shift+2".action.move-column-to-workspace = 2;
-        "Ctrl+Shift+3".action.move-column-to-workspace = 3;
-        "Ctrl+Shift+4".action.move-column-to-workspace = 4;
-        "Ctrl+Shift+5".action.move-column-to-workspace = 5;
+        "Mod+Shift+1".action.move-column-to-workspace = 1;
+        "Mod+Shift+2".action.move-column-to-workspace = 2;
+        "Mod+Shift+3".action.move-column-to-workspace = 3;
+        "Mod+Shift+4".action.move-column-to-workspace = 4;
+        "Mod+Shift+5".action.move-column-to-workspace = 5;
       };
     };
   };

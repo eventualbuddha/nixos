@@ -11,4 +11,12 @@
   };
 
   programs.zoxide.enable = true;
+
+  # Starship prompt, using the upstream "gruvbox-rainbow" preset verbatim
+  # (fetched from starship/starship's own presets, not hand-rolled).
+  programs.starship = {
+    enable = true;
+    enableFishIntegration = true;
+    settings = builtins.fromTOML (builtins.readFile ./starship-gruvbox-rainbow.toml);
+  };
 }
