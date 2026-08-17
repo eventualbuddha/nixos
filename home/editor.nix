@@ -50,6 +50,13 @@
     -- delete, which gets noisy fast. Instead the "+ register stays opt-in --
     -- see the <leader>y keymap in keymaps.lua for the actual "copy this to the
     -- system clipboard" action.
+    --
+    -- LazyVim's own lazyvim.config.options sets clipboard=unnamedplus by
+    -- default and loads before this file, so it has to be explicitly reset
+    -- here -- otherwise its default silently wins and every yank/delete
+    -- still syncs to the system clipboard despite the above.
+    vim.opt.clipboard = ""
+
     vim.g.clipboard = {
       name = "OSC 52",
       copy = {
