@@ -199,6 +199,8 @@ in
         "Shift+Print".action.screenshot-screen = { show-pointer = false; }; # fullscreen
         "Ctrl+Print".action.spawn = [ "screen-record-toggle" ]; # toggle recording
 
+        "Mod+O".action.toggle-overview = [ ];
+
         # Arrow keys...
         "Mod+Left".action.focus-column-left = [ ];
         "Mod+Right".action.focus-column-right = [ ];
