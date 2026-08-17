@@ -48,10 +48,12 @@
       unit = "imperial";
     };
 
-    # Wallpaper rotation from whatever you drop in ~/Pictures/Wallpapers
-    # (noctalia's default directory when unset -- set explicitly here anyway).
+    # Wallpaper rotation. ~/Pictures/Wallpapers holds one subfolder per "set"
+    # (e.g. Vancouver/) so sets stay exclusive -- `directory` below points at
+    # whichever set is currently active; switch sets by changing this to a
+    # different subfolder path and re-applying.
     wallpaper = {
-      directory = "/home/brian/Pictures/Wallpapers";
+      directory = "/home/brian/Pictures/Wallpapers/Vancouver";
       automation = {
         enabled = true;
         interval_seconds = 1800; # 30 min
