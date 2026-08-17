@@ -141,7 +141,13 @@
   security.pam.u2f = {
     enable = false; # keep the global default off; opt in per-service below
     control = "sufficient";
-    settings.cue = true;
+    # cue=false: with it on, the password fell back to *visibly echoing* on
+    # screen every time the key wasn't touched (reliably reproducible) --
+    # the "touch your device" reminder writes to the tty outside PAM's
+    # normal conversation flow, and something in that path was leaving
+    # echo in the wrong state by the time pam_unix's password prompt ran.
+    # Auth itself was never affected, only the on-screen echo.
+    settings.cue = false;
   };
   security.pam.services.sudo.u2f.enable = true;
   security.pam.services.polkit-1.u2f.enable = true;
