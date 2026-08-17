@@ -62,6 +62,11 @@
   # else here -- used only for the handful of things that need it.
   services.flatpak.enable = true;
 
+  # virt-manager (libvirt/QEMU-KVM), for local VMs. OVMF (UEFI guest firmware)
+  # ships by default now, no separate opt-in needed.
+  virtualisation.libvirtd.enable = true;
+  programs.virt-manager.enable = true;
+
   # 1Password (CLI + GUI, with polkit/browser-integration wrappers).
   programs._1password.enable = true;
   programs._1password-gui = {
@@ -99,7 +104,7 @@
   users.users."brian" = {
     isNormalUser = true;
     description = "Brian Donovan";
-    extraGroups = [ "networkmanager" "wheel" ];
+    extraGroups = [ "networkmanager" "wheel" "libvirtd" ];
     shell = pkgs.fish;
     packages = with pkgs; [
       #  thunderbird
