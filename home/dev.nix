@@ -74,16 +74,25 @@ in
 
       # SSH-format signing (git natively supports this since 2.34, GitHub
       # verifies it since 2022) -- reuses ssh-keygen instead of standing up a
-      # separate GPG keyring. Dedicated YubiKey-resident key (not the
-      # id_ed25519_sk auth key from setup-ssh-yubikey.sh): GitHub treats
+      # separate GPG keyring. Dedicated YubiKey key, kept distinct from the
+      # id_ed25519_sk auth key from setup-ssh-yubikey.sh: GitHub treats
       # "Authentication Key" and "Signing Key" as distinct roles, and a
       # signing key alone can't be used to log in anywhere, so keeping it
       # separate limits what a compromised/rotated key affects. Generate it
       # once, manually (touch required, not something Nix can do):
-      #   ssh-keygen -t ed25519-sk -O resident -f ~/.ssh/id_ed25519_sign_sk \
+      #   ssh-keygen -t ed25519-sk -f ~/.ssh/id_ed25519_sign_sk \
       #     -C "brian@donovans.cc (git signing)"
       # then add the .pub as a *Signing Key* (not Authentication Key) at
       # https://github.com/settings/keys.
+      #
+      # Deliberately NOT -O resident, and the same goes for the auth key. A
+      # resident credential is identified by (application, username), which
+      # ssh-keygen defaults to "ssh:" and an empty username -- so generating
+      # either key evicted the other, silently, and this key was destroyed
+      # twice that way before both were made non-resident. The cost of
+      # non-resident is that ~/.ssh/id_ed25519_sign_sk is the only copy of the
+      # key handle: back it up, because `ssh-keygen -K` cannot re-download it
+      # (that needs a FIDO PIN, which this touch-only setup does not set).
       signing = {
         key = "${config.home.homeDirectory}/.ssh/id_ed25519_sign_sk.pub";
         format = "ssh";
@@ -102,5 +111,5 @@ in
   };
 
   xdg.configFile."git/allowed_signers".text =
-    "brian@donovans.cc sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIPvWKo8q3J1u7QG7CzMoWH8w27wpdlJVUqYI2bme5Zt1AAAABHNzaDo=\n";
+    "brian@donovans.cc sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIHnmvv0Kzy7ESc0ghCgBngWIuVw0V+VAFFzfxEXNuebFAAAABHNzaDo=\n";
 }
