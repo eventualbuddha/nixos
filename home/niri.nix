@@ -287,6 +287,17 @@ in
         "Alt+Shift+BracketLeft" = typeChar "”";
         "Alt+BracketRight" = typeChar "‘";
         "Alt+Shift+BracketRight" = typeChar "’";
+        # Math, on the same keys macOS puts them. The rest of macOS's math set
+        # (v/p/x/j/w/b/d/z/m/l -> sqrt/pi/approx/delta/sum/integral/partial/
+        # omega/mu/not) sits on Alt+<letter> and is left unbound for the reason
+        # in the `typeChar` comment -- Alt+V is Firefox's View menu, and so on.
+        "Alt+Comma" = typeChar "≤";
+        "Alt+Period" = typeChar "≥";
+        "Alt+Equal" = typeChar "≠";
+        "Alt+Shift+Equal" = typeChar "±";
+        "Alt+Slash" = typeChar "÷";
+        "Alt+5" = typeChar "∞";
+        "Alt+Shift+8" = typeChar "°";
 
         # macOS-style screenshot triad, all on the actual Print Screen key
         # instead of Super+Shift+3/4/5 (freed up below for move-to-workspace).
