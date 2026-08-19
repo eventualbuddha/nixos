@@ -34,33 +34,39 @@ let
     exec env XDG_CURRENT_DESKTOP=GNOME ${pkgs.gnome-control-center}/bin/gnome-control-center "$@"
   '';
 
-  # macOS-style universal copy. Ctrl+C means "copy" almost everywhere, but
-  # terminals reserve it for SIGINT and use Ctrl+Shift+C for copy instead --
-  # so this checks the focused window's app-id and injects the right combo.
-  # Add more app-ids to the terminal case as you add more terminal emulators.
-  modCopy = pkgs.writeShellScriptBin "mod-copy" ''
-    set -euo pipefail
-    app_id=$(${pkgs.niri}/bin/niri msg --json focused-window | ${pkgs.jq}/bin/jq -r '.app_id // empty')
-    case "$app_id" in
-      com.mitchellh.ghostty)
-        ${pkgs.wtype}/bin/wtype -M ctrl -M shift -k c -m shift -m ctrl
-        ;;
-      *)
-        ${pkgs.wtype}/bin/wtype -M ctrl -k c -m ctrl
-        ;;
-    esac
-  '';
+  # macOS-style universal copy/paste. Ctrl+C and Ctrl+V mean copy/paste almost
+  # everywhere, but terminals reserve Ctrl+C for SIGINT (and Ctrl+V for the
+  # literal-next-key quote) and use the Ctrl+Shift+ variants instead -- so these
+  # check the focused window's app-id and inject the right combo. Add more
+  # app-ids to the terminal case as you add more terminal emulators.
+  modClipboard =
+    name: key:
+    pkgs.writeShellScriptBin name ''
+      set -euo pipefail
+      app_id=$(${pkgs.niri}/bin/niri msg --json focused-window | ${pkgs.jq}/bin/jq -r '.app_id // empty')
+      case "$app_id" in
+        com.mitchellh.ghostty)
+          ${pkgs.wtype}/bin/wtype -M ctrl -M shift -k ${key} -m shift -m ctrl
+          ;;
+        *)
+          ${pkgs.wtype}/bin/wtype -M ctrl -k ${key} -m ctrl
+          ;;
+      esac
+    '';
+  modCopy = modClipboard "mod-copy" "c";
+  modPaste = modClipboard "mod-paste" "v";
 in
 {
   home.packages = [
     screenRecordToggle
     gnomeSettings
     modCopy
+    modPaste
     pkgs.wf-recorder
     pkgs.libnotify
     pkgs.wl-clipboard
-    pkgs.wtype # virtual-keyboard text injection, used by mod-copy and the em dash bind
-    pkgs.jq # used by mod-copy to read niri's focused-window JSON
+    pkgs.wtype # virtual-keyboard text injection, used by mod-copy/mod-paste and the em dash bind
+    pkgs.jq # used by mod-copy/mod-paste to read niri's focused-window JSON
   ];
 
   programs.niri = {
@@ -203,13 +209,14 @@ in
           "session"
           "lock"
         ];
-        "Mod+V".action.spawn = [
+        "Mod+Shift+V".action.spawn = [
           "noctalia"
           "msg"
           "panel-toggle"
           "clipboard"
         ];
         "Mod+C".action.spawn = [ "mod-copy" ]; # macOS-style copy, any app
+        "Mod+V".action.spawn = [ "mod-paste" ]; # macOS-style paste, any app
         # Confirm-with-countdown logout/power panel (noctalia's own session UI).
         "Mod+Shift+Q".action.spawn = [
           "noctalia"
