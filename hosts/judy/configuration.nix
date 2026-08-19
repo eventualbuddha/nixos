@@ -18,6 +18,44 @@
   # kernel somewhere to page under pressure without needing a swap partition.
   zramSwap.enable = true;
 
+  # bambu-studio (wxGTK3) crashes on startup under niri's native Wayland: an
+  # early wx log-flush pops a message-box dialog whose underlying GTK window
+  # fails to realize, leaving a NULL widget that crashes wx's cleanup path.
+  # xwayland-satellite gives it a real X11 display to run through instead --
+  # niri only needs to implement xdg_wm_base + wm_viewporter for this to
+  # work, which even the plain nixpkgs niri build already does, so no need
+  # to switch to niri-flake's niri-unstable package for this.
+  home-manager.users.brian.systemd.user.services.xwayland-satellite = {
+    Unit = {
+      Description = "Xwayland outside your Wayland";
+      BindsTo = "graphical-session.target";
+      PartOf = "graphical-session.target";
+      After = "graphical-session.target";
+      Requisite = "graphical-session.target";
+    };
+    Service = {
+      Type = "notify";
+      NotifyAccess = "all";
+      ExecStart = "${pkgs.xwayland-satellite}/bin/xwayland-satellite :0";
+      StandardOutput = "journal";
+    };
+    Install.WantedBy = [ "graphical-session.target" ];
+  };
+
   # Bambu Studio: only judy has a Bambu printer, so keep this off other hosts.
-  environment.systemPackages = [ pkgs.bambu-studio ];
+  # Wrapped to route through xwayland-satellite (above) instead of niri's
+  # native Wayland, which it crashes on.
+  environment.systemPackages = [
+    (pkgs.symlinkJoin {
+      name = "bambu-studio-wrapped";
+      paths = [ pkgs.bambu-studio ];
+      buildInputs = [ pkgs.makeWrapper ];
+      postBuild = ''
+        rm $out/bin/bambu-studio
+        makeWrapper ${pkgs.bambu-studio}/bin/bambu-studio $out/bin/bambu-studio \
+          --set GDK_BACKEND x11 \
+          --set DISPLAY :0
+      '';
+    })
+  ];
 }
