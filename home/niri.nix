@@ -55,6 +55,19 @@ let
     '';
   modCopy = modClipboard "mod-copy" "c";
   modPaste = modClipboard "mod-paste" "v";
+
+  # macOS Option-key typography. These are global binds that inject a character
+  # through a virtual keyboard (wtype) rather than real xkb-level input, so the
+  # key combo is swallowed by niri and never reaches the focused app at all --
+  # which is why the set below sticks to punctuation keys. Alt+<letter> is left
+  # alone on purpose (GTK menu mnemonics live there), so macOS's Option+G/R/2
+  # for (c)/(R)/(TM) are deliberately not bound.
+  typeChar = char: {
+    action.spawn = [
+      "wtype"
+      char
+    ];
+  };
 in
 {
   home.packages = [
@@ -65,7 +78,7 @@ in
     pkgs.wf-recorder
     pkgs.libnotify
     pkgs.wl-clipboard
-    pkgs.wtype # virtual-keyboard text injection, used by mod-copy/mod-paste and the em dash bind
+    pkgs.wtype # virtual-keyboard text injection, used by mod-copy/mod-paste and the Alt+ typography binds
     pkgs.jq # used by mod-copy/mod-paste to read niri's focused-window JSON
   ];
 
@@ -218,6 +231,17 @@ in
         "Mod+C".action.spawn = [ "mod-copy" ]; # macOS-style copy, any app
         "Mod+V".action.spawn = [ "mod-paste" ]; # macOS-style paste, any app
         "Mod+Shift+C".action.center-column = [ ];
+        # Emoji picker: the launcher's built-in emoji provider, opened straight
+        # into its `/emo` prefix (`/` is noctalia's provider_prefix). Picking a
+        # result copies the emoji, then noctalia auto-pastes per
+        # shell.launcher.auto_paste.
+        "Mod+Period".action.spawn = [
+          "noctalia"
+          "msg"
+          "panel-open"
+          "launcher"
+          "/emo"
+        ];
         # Confirm-with-countdown logout/power panel (noctalia's own session UI).
         "Mod+Shift+Q".action.spawn = [
           "noctalia"
@@ -246,14 +270,23 @@ in
         "Mod+Minus".action.set-column-width = "-10%";
         "Mod+Equal".action.set-column-width = "+10%";
 
-        # macOS-style em dash. This is a global bind that injects the
-        # character via a virtual keyboard (wtype), not real xkb-level
-        # input -- Alt+Minus is swallowed entirely and never reaches the
-        # focused app as a keypress.
-        "Alt+Minus".action.spawn = [
-          "wtype"
-          "—"
-        ];
+        # macOS Option-key typography (see `typeChar` above for the mechanism
+        # and for why no Alt+<letter> binds live here).
+        #
+        # NB: the dashes are swapped relative to real macOS, where Option+-
+        # is the en dash and Option+Shift+- the em dash. The em dash is by far
+        # the more common one to type, so it keeps the shorter combo here.
+        "Alt+Minus" = typeChar "—";
+        "Alt+Shift+Minus" = typeChar "–";
+        "Alt+Semicolon" = typeChar "…";
+        "Alt+8" = typeChar "•";
+        # Curly quotes. niri matches binds on the *raw* (unshifted) keysym with
+        # Shift as an ordinary modifier, hence BracketLeft/BracketRight rather
+        # than BraceLeft/BraceRight for the shifted pairs.
+        "Alt+BracketLeft" = typeChar "“";
+        "Alt+Shift+BracketLeft" = typeChar "”";
+        "Alt+BracketRight" = typeChar "‘";
+        "Alt+Shift+BracketRight" = typeChar "’";
 
         # macOS-style screenshot triad, all on the actual Print Screen key
         # instead of Super+Shift+3/4/5 (freed up below for move-to-workspace).
