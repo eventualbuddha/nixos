@@ -12,6 +12,7 @@
     ./editor.nix
     ./dev.nix
     ./shell.nix
+    ./tunnels.nix
     ./apps.nix
     ./theme.nix
   ];

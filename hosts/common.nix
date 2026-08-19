@@ -137,10 +137,18 @@
   programs.ssh = {
     extraConfig = ''
       # VotingWorks VM (Tailscale)
+      # ControlMaster/ControlPersist: keeps home/tunnels.nix's per-connection
+      # `ssh -W` forwards to vx.ts from renegotiating a full handshake every
+      # time a browser tab (re)connects to localhost:3000 -- the first one
+      # opens the real connection, later ones multiplex over it, and it's
+      # dropped after 10 minutes with no channels using it.
       Host vx.ts
         HostName 100.79.161.93
         Port 2222
         User vx
+        ControlMaster auto
+        ControlPath ~/.ssh/cm-%r@%h:%p
+        ControlPersist 10m
 
       # VotingWorks Desktop (Tailscale)
       Host vx-host.ts
