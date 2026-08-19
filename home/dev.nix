@@ -69,8 +69,10 @@ in
 
     git = {
       enable = true;
-      userName = "Brian Donovan";
-      userEmail = "brian@donovans.cc";
+      settings.user = {
+        name = "Brian Donovan";
+        email = "brian@donovans.cc";
+      };
 
       # SSH-format signing (git natively supports this since 2.34, GitHub
       # verifies it since 2022) -- reuses ssh-keygen instead of standing up a
