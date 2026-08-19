@@ -171,7 +171,13 @@ in
       ];
 
       binds = {
-        "Mod+Escape".action.toggle-keyboard-shortcuts-inhibit = [ ];
+        "Mod+Escape".action.spawn = [
+          "noctalia"
+          "msg"
+          "session"
+          "lock"
+        ];
+        "Mod+Shift+Escape".action.toggle-keyboard-shortcuts-inhibit = [ ];
         "Mod+Shift+P".action.power-off-monitors = [ ];
         "Control+Alt+Delete".action.quit = [ ];
 
