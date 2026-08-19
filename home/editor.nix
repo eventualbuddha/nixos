@@ -70,6 +70,26 @@
     }
   '';
 
+  # Inline "who last touched this line" blame, shown as dimmed virtual text at
+  # the end of the cursor's line. gitsigns.nvim already ships with LazyVim, so
+  # this is only turning on an option it has but leaves off by default -- no
+  # extra plugin, and the spec merges into LazyVim's own gitsigns spec.
+  xdg.configFile."nvim/lua/plugins/gitsigns.lua".text = ''
+    return {
+      "lewis6991/gitsigns.nvim",
+      opts = {
+        current_line_blame = true,
+        current_line_blame_opts = {
+          virt_text = true,
+          virt_text_pos = "eol",
+          delay = 300,
+          ignore_whitespace = false,
+        },
+        current_line_blame_formatter = "  <author>, <author_time:%R> - <summary>",
+      },
+    }
+  '';
+
   xdg.configFile."nvim/lua/config/keymaps.lua".text = ''
     -- Keymaps are automatically loaded on the VeryLazy event
     -- Default keymaps that are always set: https://github.com/LazyVim/LazyVim/blob/main/lua/lazyvim/config/keymaps.lua
