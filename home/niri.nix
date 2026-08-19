@@ -217,6 +217,7 @@ in
         ];
         "Mod+C".action.spawn = [ "mod-copy" ]; # macOS-style copy, any app
         "Mod+V".action.spawn = [ "mod-paste" ]; # macOS-style paste, any app
+        "Mod+Shift+C".action.center-column = [ ];
         # Confirm-with-countdown logout/power panel (noctalia's own session UI).
         "Mod+Shift+Q".action.spawn = [
           "noctalia"
