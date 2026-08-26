@@ -85,6 +85,15 @@
   virtualisation.libvirtd.enable = true;
   programs.virt-manager.enable = true;
 
+  # virtiofsd, for `<filesystem><driver type='virtiofs'/>` shares -- the vxsuite
+  # VM mounts ~/code/vxsuite and ~/code/election-definitions that way. libvirt
+  # looks for the vhost-user backend's JSON descriptor in a fixed set of
+  # directories rather than on $PATH, so merely installing the package isn't
+  # enough; `vhostUserPackages` is what puts the descriptor somewhere libvirt
+  # actually searches. Without this, starting such a domain fails with
+  # "Unable to find a satisfying virtiofsd".
+  virtualisation.libvirtd.qemu.vhostUserPackages = [ pkgs.virtiofsd ];
+
   # Tailscale. `trustedInterfaces` skips the firewall for anything already
   # on the tailnet; the UDP port is opened so peers can connect directly
   # instead of relaying through a DERP server. Authenticating this machine
@@ -235,9 +244,65 @@
   # disabled -- there is no gpg-agent here and nothing uses the OpenPGP
   # applet. Harmless; the U2F watcher is the one that matters.
   #
-  # Notifications go out over org.freedesktop.Notifications, served by
-  # noctalia under niri and by gnome-shell under GNOME.
-  programs.yubikey-touch-detector.enable = true;
+  # The detector's own libnotify output is deliberately off. It sends a plain
+  # normal-urgency notification with hardcoded text, which under noctalia's
+  # theme renders dark-on-dark and is easy to miss -- exactly the thing this is
+  # supposed to prevent. noctalia's notification filters cannot fix that: they
+  # gate what is allowed through (toast/history/sound/dnd) and can override the
+  # duration, but they do not restyle anything.
+  #
+  # Instead the detector's unix socket is consumed directly. It emits fixed
+  # 5-byte events (U2F_1/U2F_0, and the GPG/MAC equivalents), which is enough
+  # to raise a *critical* urgency notification on the way in and retract it on
+  # the way out. Critical is the part that matters: noctalia styles it
+  # distinctly from normal, so the prompt actually stands out.
+  programs.yubikey-touch-detector.libnotify = false;
+
+  systemd.user.services.yubikey-touch-notify = {
+    description = "Show a critical notification while the YubiKey waits for a touch";
+    # Connecting to the socket is what socket-activates the detector, so this
+    # must not start before the socket unit exists.
+    requires = [ "yubikey-touch-detector.socket" ];
+    after = [
+      "yubikey-touch-detector.socket"
+      "graphical-session.target"
+    ];
+    partOf = [ "graphical-session.target" ];
+    wantedBy = [ "graphical-session.target" ];
+    serviceConfig = {
+      Restart = "on-failure";
+      RestartSec = 2;
+      ExecStart = pkgs.writeShellScript "yubikey-touch-notify" ''
+        set -uo pipefail
+
+        # -t 0 means the toast never expires on its own, so every shown
+        # notification must be closed explicitly when the touch completes --
+        # otherwise a stale "touch your key" prompt sits on screen forever.
+        # The id from --print-id is what makes that retraction possible.
+        id=""
+        while IFS= read -r -N 5 msg; do
+          case "$msg" in
+            U2F_1|GPG_1|MAC_1)
+              id=$(${pkgs.libnotify}/bin/notify-send --print-id \
+                     --urgency=critical --expire-time=0 --app-name=YubiKey \
+                     --icon=${pkgs.yubikey-touch-detector}/share/icons/hicolor/128x128/apps/yubikey-touch-detector.png \
+                     "Touch your YubiKey" "Waiting for a touch to continue")
+              ;;
+            U2F_0|GPG_0|MAC_0)
+              if [ -n "$id" ]; then
+                ${pkgs.glib}/bin/gdbus call --session \
+                  --dest org.freedesktop.Notifications \
+                  --object-path /org/freedesktop/Notifications \
+                  --method org.freedesktop.Notifications.CloseNotification "$id" \
+                  >/dev/null 2>&1 || true
+                id=""
+              fi
+              ;;
+          esac
+        done < <(${pkgs.socat}/bin/socat -u UNIX-CONNECT:"$XDG_RUNTIME_DIR/yubikey-touch-detector.socket" -)
+      '';
+    };
+  };
 
   # Some programs need SUID wrappers, can be configured further or are
   # started in user sessions.
