@@ -216,6 +216,29 @@
   security.pam.services.sudo.u2f.enable = true;
   security.pam.services.polkit-1.u2f.enable = true;
 
+  # On-screen "your YubiKey wants a touch" notification, for both machines.
+  # Every touch-gated operation here is silent by default -- sudo and polkit
+  # via pam_u2f, git signing and ssh via the sk- keys -- and the only feedback
+  # is the key itself blinking, wherever it happens to be plugged in. pam_u2f's
+  # own `cue` is not the answer: it is disabled deliberately (see the echo bug
+  # noted on security.pam.u2f above), and it would only ever cover the tty
+  # case, never a polkit dialog or a `git commit` from an editor.
+  #
+  # This detects touch requests by listening on /dev/hidraw* for them as per
+  # the FIDO spec, so one mechanism covers all of the above rather than just
+  # one path. It runs as a systemd user service and reads the device through
+  # the uaccess ACL systemd already grants the logged-in user, so it needs no
+  # privileges of its own. Verified against a real signing request: the U2F
+  # watcher fires the moment the key is asked for a touch.
+  #
+  # It also ships GPG and ssh-agent watchers, which will log that they are
+  # disabled -- there is no gpg-agent here and nothing uses the OpenPGP
+  # applet. Harmless; the U2F watcher is the one that matters.
+  #
+  # Notifications go out over org.freedesktop.Notifications, served by
+  # noctalia under niri and by gnome-shell under GNOME.
+  programs.yubikey-touch-detector.enable = true;
+
   # Some programs need SUID wrappers, can be configured further or are
   # started in user sessions.
   # programs.mtr.enable = true;
