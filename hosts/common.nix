@@ -51,6 +51,20 @@
   services.displayManager.gdm.enable = true;
   services.desktopManager.gnome.enable = true;
 
+  # GNOME's keyring provides an SSH agent, and gcr loads ~/.ssh keys into it on
+  # demand. It advertises FIDO/"sk" keys but cannot sign with them -- there is
+  # no security-key provider behind it -- so once it picks up
+  # id_ed25519_sign_sk, signing dies with "agent refused operation". That is a
+  # hard failure, not a slow path: `ssh-keygen -Y sign` uses the agent whenever
+  # the agent claims the key, with no fallback to reading the file. It is also
+  # an intermittent-looking one, since the key is only loaded on first use --
+  # commits sign fine right up until something touches the agent.
+  #
+  # Every key on these machines is an sk key, so the gcr agent has nothing it
+  # can usefully hold. OpenSSH's own agent does support them.
+  services.gnome.gcr-ssh-agent.enable = false;
+  programs.ssh.startAgent = true;
+
   # niri, added alongside GNOME. This also wires up desktop portals/polkit
   # and registers a Wayland session entry that GDM will list.
   #
