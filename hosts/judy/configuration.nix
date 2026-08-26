@@ -12,6 +12,23 @@
 
   networking.hostName = "judy";
 
+  # The vxsuite VM runs on work, on a libvirt network only work can route to,
+  # so reach it by jumping through work. Everything else about the alias --
+  # address, user, agent forwarding, connection multiplexing -- comes from the
+  # `Host vx` block in ../common.nix; this only adds the hop.
+  #
+  # Deliberately not a port forward on work (2222 -> guest:22, the way the
+  # Fedora install did it): libvirt gives an isolated network a pair of
+  # `LIBVIRT_FWI/FWO ... -j REJECT` rules, so a DNAT'd packet gets rewritten and
+  # then dropped on its way into virbr-guard. Making it work means an ACCEPT
+  # ordered ahead of libvirt's own rules, which libvirt reinstalls from scratch
+  # on every network reload. ProxyJump needs nothing on the far end and exposes
+  # no extra port.
+  programs.ssh.extraConfig = ''
+    Host vx
+      ProxyJump vx-host.ts
+  '';
+
   # judy has 16G RAM and no swap, which meant a heavy from-source build (e.g.
   # bambu-studio's CGAL/OpenCASCADE/wxWidgets dependency tree) could blow past
   # physical memory and get OOM-killed instead of paging out. zram gives the

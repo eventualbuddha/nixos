@@ -76,6 +76,16 @@
   # `sudo docker` too. Keep that.
   virtualisation.docker.enable = true;
 
+  # --- The vxsuite VM --------------------------------------------------------
+  #
+  # This is the machine the VM actually runs on, so `ssh vx` needs nothing
+  # host-specific here: the `Host vx` block in ../common.nix points straight at
+  # the guest's address on the local `vmguard` bridge. Other hosts are the ones
+  # that have to add a ProxyJump to reach it.
+  #
+  # The guest is defined in libvirt's own state (`virsh dumpxml vxsuite`), not
+  # here -- NixOS has no declarative option for libvirt domains.
+
   # --- User identity ---------------------------------------------------------
   #
   # NixOS's isNormalUser default puts brian in the shared "users" group (gid

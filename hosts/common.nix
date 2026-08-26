@@ -153,21 +153,41 @@
 
   programs.ssh = {
     extraConfig = ''
-      # VotingWorks VM (Tailscale)
+      # The vxsuite VM, a libvirt guest on work. 192.168.124.179 is a static
+      # DHCP reservation (keyed on the guest's MAC) in the `vmguard` network
+      # definition, so it doesn't drift.
+      #
+      # `vmguard` is an isolated network -- no `<forward>` in its XML -- so that
+      # address is only routable from work itself. hosts/judy adds a ProxyJump
+      # through work to this same name, which is why the alias is `vx` on every
+      # machine rather than one name for local and another for remote.
+      #
       # ControlMaster/ControlPersist: keeps home/tunnels.nix's per-connection
-      # `ssh -W` forwards to vx.ts from renegotiating a full handshake every
-      # time a browser tab (re)connects to localhost:3000 -- the first one
-      # opens the real connection, later ones multiplex over it, and it's
-      # dropped after 10 minutes with no channels using it.
-      Host vx.ts
-        HostName 100.79.161.93
-        Port 2222
+      # `ssh -W` forwards from renegotiating a full handshake every time a
+      # browser tab (re)connects to localhost:3000 -- the first one opens the
+      # real connection, later ones multiplex over it, and it's dropped after
+      # 10 minutes with no channels using it. Worth more still where `vx` goes
+      # through a jump host, since each new connection is otherwise two
+      # handshakes rather than one.
+      #
+      # The sharp edge of ControlMaster: interrupting an attempt that never
+      # authenticated -- Ctrl-C at an unexpected password prompt, a killed
+      # `ssh` -- can leave a backgrounded master parked on the ControlPath that
+      # never completed a handshake. It answers on the socket but can't open a
+      # session, so every later `ssh vx` blocks on it instead of failing. A
+      # clean auth failure leaves nothing behind; only an interrupted one does.
+      # `ssh -O check vx` says whether a master is there, `ssh -O exit vx`
+      # clears it.
+      Host vx
+        HostName 192.168.124.179
         User vx
+        ForwardAgent yes
         ControlMaster auto
         ControlPath ~/.ssh/cm-%r@%h:%p
         ControlPersist 10m
 
-      # VotingWorks Desktop (Tailscale)
+      # work itself, over Tailscale. Also the jump host `vx` goes through from
+      # anywhere that isn't work.
       Host vx-host.ts
         HostName 100.79.161.93
         User brian
