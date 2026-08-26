@@ -88,3 +88,41 @@ register it at https://github.com/settings/keys as a **Signing Key** (not an
 Authentication Key -- GitHub treats those as distinct roles). Every machine
 trusts every key in that list, which is what lets `git log --show-signature`
 verify commits made on the other machine.
+
+## VMGuard: the vxsuite VM's egress proxy (work only)
+
+The vxsuite guest sits on an isolated libvirt network (`vmguard`) with no route
+off its own subnet. `hosts/work/vmguard.nix` runs the mitmproxy-based egress
+gate that is its *only* way out: reads flow, writes are pinned to specific orgs,
+a host-side GitHub PAT is injected so the guest never holds a credential, and
+anything unrecognized is denied and logged. `hosts/work/vmguard/` holds the
+policy addon, its offline tests, and `NOTES.md` -- the rationale for every rule
+in it, which is what to read before widening anything.
+
+The service is declarative. Two files are not, because a git repo is the wrong
+place for either, and the service will not work without them:
+
+1. **`/etc/vmguard/secrets.env`** -- root-owned `0600`, `GH_PAT` and optionally
+   `CIRCLE_TOKEN`. Copy `hosts/work/vmguard/secrets.env.template` and fill it
+   in. Without this the unit fails to start at all (`EnvironmentFile`).
+
+2. **`/var/lib/vmguard/mitmproxy-conf/`** -- the MITM CA, private key included.
+   This has to be **preserved, never regenerated**. The guest's trust store
+   already contains this exact CA, so if mitmproxy mints a fresh one on an empty
+   confdir the service comes up looking perfectly healthy and every TLS-bumped
+   connection inside the guest fails with no obvious cause. Restore the old
+   directory, `chown -R vmguard:vmguard` it, and restart.
+
+The guest half is not managed from here at all -- it lives in the VM's disk
+image: the CA in its trust store, `/etc/profile.d/vmguard.sh` (bash),
+`~/.config/fish/conf.d/vmguard.fish` (fish, and `vx`'s shell *is* fish, so this
+is the one that matters interactively), and `/etc/apt/apt.conf.d/00-vmguard-proxy`
+(`sudo` strips proxy env, so apt needs its own). Those proxy variables are the
+only egress path there is; commenting them out looks exactly like a broken
+network.
+
+`hosts/work/vmguard/Justfile` came over from the Fedora setup. Its operational
+recipes still work -- `just denies`, `just gql-denies`, `just writes`,
+`just creds`, `just log` -- but its *install* recipes (`install`,
+`firewall-open`, `deploy`, `logrotate-install`) are superseded by this flake;
+editing the addon and re-applying is the deploy path now.

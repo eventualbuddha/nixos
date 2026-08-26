@@ -2,3 +2,4 @@ result
 result-*
 build.log
 switch.log
+__pycache__/

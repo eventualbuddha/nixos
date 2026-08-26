@@ -13,6 +13,7 @@
   imports = [
     ./hardware-configuration.nix
     ../common.nix
+    ./vmguard.nix
   ];
 
   networking.hostName = "work";

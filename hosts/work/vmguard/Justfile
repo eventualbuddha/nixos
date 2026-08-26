@@ -1,0 +1,181 @@
+# VMGuard — install / setup / operations
+#
+# Run from this staging dir on the HOST as `brian`. Three execution contexts:
+#   • host as brian  — virsh recipes (libvirt system connection, no sudo)
+#   • host as root   — recipes that call `sudo` (you'll be prompted for a password)
+#   • guest          — recipes that go over `ssh vx`
+#
+# Quick start:
+#   just                 # list recipes
+#   just preflight       # sanity-check the box before installing
+#   just net-up          # 1. isolated network
+#   cp artifacts/secrets.env.template secrets.env && $EDITOR secrets.env   # fill in GH_PAT
+#   just install         # 2. host service (sudo)
+#   just firewall-open   # 3. open the proxy port (sudo)
+#   just guest-setup     # 4. CA + proxy env + apt proxy in the guest, then `claude /login`
+#   just move-nic        # 5. DISRUPTIVE: cut the VM onto the isolated net
+#
+# Day-to-day: `just deploy` (after editing the addon), `just denies`, `just creds`.
+#
+# Requires: just (`sudo dnf install just`), virsh, and an ssh alias `vx` for the guest.
+
+set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
+
+staging   := justfile_directory()
+addon     := staging / "artifacts" / "egress_filter.py"
+unit      := staging / "artifacts" / "vmguard-github.service"
+service   := "vmguard-github"
+opt_addon := "/opt/vmguard/egress_filter.py"
+denylog   := "/var/lib/vmguard/requests.log"
+guest     := "vx"
+net       := "vmguard"
+listen    := "192.168.124.1:8080"
+
+# list all recipes (default)
+_default:
+    @just --list --unsorted
+
+# ---------- host setup (run in order) ----------
+
+# check prerequisites before installing (safe; read-only)
+preflight:
+    @command -v virsh >/dev/null && echo "ok: virsh" || echo "MISSING: virsh"
+    @test -f {{staging}}/secrets.env && ! grep -q REPLACE_ME {{staging}}/secrets.env && echo "ok: secrets.env filled in" || echo "TODO: cp artifacts/secrets.env.template secrets.env, then fill in GH_PAT"
+    @grep -q '^CIRCLE_TOKEN=' {{staging}}/secrets.env 2>/dev/null && echo "ok: CIRCLE_TOKEN set (CI job retry enabled — NOTES 43)" || echo "note: no CIRCLE_TOKEN — circleci reads work, retrying a failed job is denied"
+    @test -f {{staging}}/mitmproxy-conf/mitmproxy-ca-cert.pem && echo "ok: MITM CA present" || echo "MISSING: mitmproxy-conf/mitmproxy-ca-cert.pem"
+
+# 1. define + start + autostart the isolated libvirt network (no sudo)
+net-up:
+    virsh net-info {{net}} >/dev/null 2>&1 || virsh net-define {{staging}}/artifacts/vmguard.xml
+    virsh net-start {{net}} 2>/dev/null || true
+    virsh net-autostart {{net}}
+    @virsh net-info {{net}}
+
+# 2. privileged host install: vmguard user, /opt venv+addon, CA, secrets, systemd unit (sudo)
+install:
+    sudo bash {{staging}}/install-host.sh
+
+# 3. open the proxy port in the libvirt firewalld zone, now + permanently (sudo)
+firewall-open:
+    sudo firewall-cmd --zone=libvirt --add-port=8080/tcp
+    sudo firewall-cmd --permanent --zone=libvirt --add-port=8080/tcp
+
+# 4. push MITM CA to the guest + run guest-setup (CA trust, proxy env, apt proxy); then `claude /login`
+guest-setup:
+    scp {{staging}}/mitmproxy-conf/mitmproxy-ca-cert.pem {{guest}}:/tmp/mitmproxy-ca-cert.pem
+    scp {{staging}}/guest-setup.sh {{guest}}:/tmp/guest-setup.sh
+    ssh {{guest}} bash /tmp/guest-setup.sh /tmp/mitmproxy-ca-cert.pem
+    @echo ">> now, inside the guest: claude /login"
+
+# 5. DISRUPTIVE: detach the NAT NIC, attach the isolated NIC, cold-restart the VM (prompts)
+move-nic:
+    bash {{staging}}/move-vm-nic.sh
+
+# ---------- operations (day-to-day) ----------
+
+# run the offline addon unit tests (no mitmproxy/network needed)
+test:
+    python3 {{staging}}/tests/test_filter.py
+
+# deploy the edited addon to /opt and restart the service (sudo). Tests run first.
+# The systemd unit is synced too: it names the addon path and the --ignore-hosts tunnel list,
+# and unit drift has bitten before (NOTES 11 needed a hand-edited unit + daemon-reload).
+deploy: test
+    sudo install -o vmguard -g vmguard -m 644 {{addon}} {{opt_addon}}
+    sudo install -m 644 {{unit}} /etc/systemd/system/{{service}}.service
+    sudo rm -f /opt/vmguard/github_filter.py    # one-time: pre-rename addon, see NOTES 27
+    sudo systemctl daemon-reload
+    sudo systemctl restart {{service}}
+    @sleep 1
+    @just status
+
+# push the staging secrets.env to /etc/vmguard and restart (sudo).
+# `just deploy` syncs the addon and the unit but NOT the credentials, so this is how a new or
+# rotated secret — e.g. adding CIRCLE_TOKEN for CI job retry (NOTES 43) — reaches the service.
+secrets:
+    @test -f {{staging}}/secrets.env || { echo "no {{staging}}/secrets.env — cp artifacts/secrets.env.template secrets.env first"; exit 1; }
+    @! grep -q REPLACE_ME {{staging}}/secrets.env || { echo "secrets.env still has REPLACE_ME — fill those in, or delete the optional lines"; exit 1; }
+    sudo install -o vmguard -g vmguard -m 600 {{staging}}/secrets.env /etc/vmguard/secrets.env
+    sudo systemctl restart {{service}}
+    @sleep 1
+    @just status
+
+# service status + confirm the proxy is listening
+status:
+    @systemctl --no-pager --lines=5 status {{service}} || true
+    @echo "listener (expect {{listen}}):"
+    @ss -ltn 2>/dev/null | grep -F '{{listen}}' || echo "  NOT LISTENING — see: just logs"
+
+# restart the proxy service (sudo)
+restart:
+    sudo systemctl restart {{service}}
+
+# tail the service journal (sudo)
+logs:
+    sudo journalctl -u {{service}} -n 50 --no-pager
+
+# tail the request/deny log (n lines, default 30)
+log n="30":
+    tail -n {{n}} {{denylog}}
+
+# install the logrotate config for requests.log, then dry-run it to show what it would do (sudo)
+logrotate-install:
+    sudo install -m 644 {{staging}}/artifacts/vmguard-logrotate.conf /etc/logrotate.d/vmguard
+    @echo "-- dry run (makes no changes):"
+    sudo logrotate -d /etc/logrotate.d/vmguard
+
+# force a rotation right now (sudo) — use to shrink an already-oversized requests.log
+logrotate-now:
+    sudo logrotate -f /etc/logrotate.d/vmguard
+    @ls -lh {{denylog}}*
+
+# recent DENY hosts, collapsed & counted (excludes noise we block on purpose: datadog
+# telemetry, mcp-proxy, and loopback polls that shouldn't reach the proxy at all — see NOTES 15)
+denies n="1000":
+    @tail -n {{n}} {{denylog}} | grep '"kind": "DENY"' | grep -oP '"host": "\K[^"]+' | grep -viE 'datadoghq|mcp-proxy|^localhost$|^127\.0\.0\.1$|^::1$' | sort | uniq -c | sort -rn || echo "(no denies)"
+
+# DENY hosts seen SINCE the last service restart (ignores stale pre-fix entries)
+denies-since:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ts=$(date -d "$(systemctl show {{service}} -p ActiveEnterTimestamp --value)" +%Y-%m-%dT%H:%M:%S)
+    echo "denies since restart ($ts):"
+    awk -F'"' -v t="$ts" '/"kind": "DENY"/ && $4 >= t' {{denylog}} \
+      | grep -oP '"host": "\K[^"]+' | grep -viE 'datadoghq|mcp-proxy|^localhost$|^127\.0\.0\.1$|^::1$' \
+      | sort | uniq -c | sort -rn || echo "  (none)"
+
+# denied GraphQL mutations, grouped by the op/org that caused it — use to decide what to widen
+gql-denies n="2000":
+    #!/usr/bin/env python3
+    import collections, json, subprocess
+    out = subprocess.run(["tail", "-n", "{{n}}", "{{denylog}}"],
+                         capture_output=True, text=True).stdout
+    seen = collections.Counter()
+    for line in out.splitlines():
+        try:
+            r = json.loads(line)
+        except ValueError:
+            continue
+        if r.get("kind") != "DENY" or not r.get("reason", "").startswith("graphql mutation"):
+            continue
+        key = (r.get("why", "?"), ",".join(r.get("bad_ops") or r.get("ops") or []),
+               ",".join(r.get("bad_orgs") or []))
+        seen[key] += 1
+    if not seen:
+        print("(no graphql denies — note: 'why'/'ops' only appear on entries logged after NOTES 23)")
+    for (why, ops, orgs), n in seen.most_common():
+        print(f"{n:6}  {why:32}  ops={ops or '-'}  orgs={orgs or '-'}")
+
+# recent allowed WRITE ops — audit trail for pushes and PR/issue/merge mutations
+writes n="1000":
+    @tail -n {{n}} {{denylog}} | grep '"kind": "WRITE"' || echo "(no writes logged)"
+
+# check the guest's Claude credential expiry (does it need /login / has it auto-refreshed?)
+creds:
+    @ssh {{guest}} python3 < {{staging}}/scripts/check-creds.py
+
+# ---------- teardown ----------
+
+# reverse the whole setup (review before running; guest steps are printed, not auto-run)
+backout:
+    bash {{staging}}/backout.sh
