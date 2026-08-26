@@ -1,7 +1,7 @@
 { config, pkgs, ... }:
 
 # NB: no `imports` here for niri's home-manager module. The NixOS module
-# (`programs.niri.enable = true;` in hosts/nixos/configuration.nix) already
+# (`programs.niri.enable = true;` in hosts/common.nix) already
 # auto-imports `niri.homeModules.config` (settings only) for every user and
 # wires up the correct package -- importing `homeModules.niri` again here
 # would redeclare `programs.niri.package`/`enable` and fail to eval.
