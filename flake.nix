@@ -56,6 +56,7 @@
     {
       nixosConfigurations = {
         judy = mkHost "judy";
+        work = mkHost "work";
       };
     };
 }
