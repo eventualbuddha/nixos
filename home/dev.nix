@@ -1,6 +1,39 @@
-{ pkgs, config, ... }:
+{
+  pkgs,
+  lib,
+  config,
+  ...
+}:
 
 let
+  # Public halves of the YubiKey-backed git signing keys, one per machine.
+  # These are non-resident sk- keys: the private handle lives only in
+  # ~/.ssh/id_ed25519_sign_sk on the machine that generated it and cannot be
+  # re-downloaded from the token, so each machine gets its own rather than
+  # trying to share one file around. Every machine trusts all of them, which
+  # is what makes `git log --show-signature` verify the other machine's
+  # commits. Adding a machine means generating a key there (see the comment on
+  # `signing` below) and appending its .pub line here.
+  #
+  # Public key material, so it belongs in the flake as literal text -- it is
+  # the same string you would paste into GitHub as a Signing Key.
+  signingKeys = {
+    judy = {
+      principals = [ "brian@donovans.cc" ];
+      key = "sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIHnmvv0Kzy7ESc0ghCgBngWIuVw0V+VAFFzfxEXNuebFAAAABHNzaDo=";
+    };
+    # Commits made on work carry the work email (see hosts/work), so this key
+    # is trusted for both principals: the personal one for anything committed
+    # here before that override landed, and the work one for everything after.
+    work = {
+      principals = [
+        "brian@donovans.cc"
+        "brian@voting.works"
+      ];
+      key = "sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIC6fscqgOvUDeta3U1/jTipzwfS0B3KrA7VYwbR9hGWgAAAABHNzaDo=";
+    };
+  };
+
   # herdr isn't in nixpkgs. Building it from source isn't practical: it
   # vendors Ghostty's libghostty-vt (a Zig library) and pulls in Ghostty's
   # own Zig dependency-fetching machinery to build it -- nixpkgs' own
@@ -71,7 +104,26 @@ in
       enable = true;
       settings.user = {
         name = "Brian Donovan";
-        email = "brian@donovans.cc";
+        # mkDefault so a host can commit under a different address without
+        # having to mkForce past this -- hosts/work does exactly that.
+        email = lib.mkDefault "brian@donovans.cc";
+      };
+
+      # What `gh auth login` tries to write for itself on its last step, and
+      # cannot here: ~/.config/git/config is a home-manager symlink into the
+      # store, so it fails with "could not lock config file ... Read-only file
+      # system". The login itself still succeeds -- the token goes to the
+      # keyring and ~/.config/gh stays writable -- so the only casualty is this
+      # helper, which leaves HTTPS pushes prompting for a password that GitHub
+      # no longer accepts. Declaring it is strictly better than letting gh
+      # write it anyway: it applies on a fresh machine before `gh auth login`
+      # has ever run.
+      #
+      # Full store path rather than a bare `gh`: git runs credential helpers
+      # through a shell whose PATH is not necessarily the interactive one.
+      settings.credential = {
+        "https://github.com".helper = "!${pkgs.gh}/bin/gh auth git-credential";
+        "https://gist.github.com".helper = "!${pkgs.gh}/bin/gh auth git-credential";
       };
 
       # SSH-format signing (git natively supports this since 2.34, GitHub
@@ -112,6 +164,7 @@ in
     };
   };
 
-  xdg.configFile."git/allowed_signers".text =
-    "brian@donovans.cc sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIHnmvv0Kzy7ESc0ghCgBngWIuVw0V+VAFFzfxEXNuebFAAAABHNzaDo=\n";
+  xdg.configFile."git/allowed_signers".text = lib.concatMapStrings (
+    entry: "${lib.concatStringsSep "," entry.principals} ${entry.key}\n"
+  ) (lib.attrValues signingKeys);
 }
