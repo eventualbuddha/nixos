@@ -11,6 +11,14 @@
 
     niri.url = "github:sodiboo/niri-flake";
 
+    # LazyVim starter, seeded into ~/.config/nvim by home/editor.nix. Not a
+    # flake -- just a source tree to copy from, pinned so the bootstrap is
+    # reproducible and needs no network at activation time.
+    lazyvim-starter = {
+      url = "github:LazyVim/starter";
+      flake = false;
+    };
+
     noctalia = {
       url = "github:noctalia-dev/noctalia";
       inputs.nixpkgs.follows = "nixpkgs";

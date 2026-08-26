@@ -1,4 +1,9 @@
-{ pkgs, lib, ... }:
+{
+  inputs,
+  pkgs,
+  lib,
+  ...
+}:
 
 {
   # Plain package, not `programs.neovim.enable` -- that module unconditionally
@@ -20,14 +25,31 @@
     nixfmt
   ];
 
-  # Bootstrap the official LazyVim starter config, but only if ~/.config/nvim
-  # doesn't already exist -- this never clobbers your own edits, and matches
-  # LazyVim's own documented install method (a normal, mutable config directory
-  # managed by lazy.nvim at runtime, not something declarative nixvim fits).
-  home.activation.installLazyVim = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    if [ ! -d "$HOME/.config/nvim" ]; then
-      $DRY_RUN_CMD ${pkgs.git}/bin/git clone --depth 1 https://github.com/LazyVim/starter "$HOME/.config/nvim"
-      $DRY_RUN_CMD rm -rf "$HOME/.config/nvim/.git"
+  # Bootstrap the official LazyVim starter config: LazyVim expects a normal,
+  # mutable config directory that lazy.nvim manages at runtime, which is not
+  # something declarative nixvim fits. Only the initial seeding happens here.
+  #
+  # The starter comes from a pinned flake input rather than a `git clone` at
+  # activation time. Activation runs at boot, often before DNS is up, and it
+  # aborts at the first failing step -- so a failed clone took out every step
+  # after it, linkGeneration included. That is what left this machine's niri
+  # with its stock default config and no noctalia on first boot. Reading from
+  # the store instead means activation never touches the network, and the
+  # starter revision is pinned/updatable like every other input
+  # (`nix flake update lazyvim-starter`).
+  #
+  # Ordered after linkGeneration, and guarded on init.lua rather than on the
+  # directory, because linkGeneration also populates ~/.config/nvim (options.lua,
+  # keymaps.lua, plugins/): a directory test would report "already installed"
+  # for a tree with no LazyVim in it, and seeding first would make the starter's
+  # own copies of those files collide with the home-manager-owned ones. `cp -n`
+  # then leaves anything home-manager owns untouched, and --no-preserve=mode
+  # drops the store's read-only bits so lazy.nvim can write there.
+  home.activation.installLazyVim = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    if [ ! -e "$HOME/.config/nvim/init.lua" ]; then
+      run mkdir -p "$HOME/.config/nvim"
+      run cp -rn --no-preserve=mode,ownership \
+        ${inputs.lazyvim-starter}/. "$HOME/.config/nvim/"
     fi
   '';
 
