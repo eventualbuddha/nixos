@@ -92,4 +92,24 @@
     group = "brian";
     extraGroups = [ "users" ]; # keep the membership isNormalUser would have granted
   };
+
+  # --- Rescue access ---------------------------------------------------------
+  #
+  # Without this, a failed unlock lands in initrd emergency mode with
+  # "Cannot open access to console, the root account is locked" and there is no
+  # way in at all -- found by booting this install in a VM before cutting over.
+  #
+  # The initrd has no access to the real root's /etc/shadow, which is why this is
+  # a separate knob from root's password. `true` means a passwordless root shell
+  # if (and only if) the initrd fails. At that point the root filesystem is still
+  # encrypted, so there is nothing there to read.
+  #
+  # REVISIT BEFORE ENROLLING TPM2 (phase 7): once the TPM unlocks the disk
+  # automatically, PCRs match during a normal boot, so anyone who can provoke an
+  # initrd failure gets a root shell that can then ask the TPM for the key.
+  # Secure Boot + lanzaboote mitigates this (the kernel command line is part of
+  # the signed UKI, so emergency mode cannot simply be requested), but this
+  # should become a hashed password at that point. It is deliberately not one
+  # today because this flake is a public repo.
+  boot.initrd.systemd.emergencyAccess = true;
 }
