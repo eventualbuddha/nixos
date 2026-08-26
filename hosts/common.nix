@@ -256,7 +256,12 @@
   # to raise a *critical* urgency notification on the way in and retract it on
   # the way out. Critical is the part that matters: noctalia styles it
   # distinctly from normal, so the prompt actually stands out.
-  programs.yubikey-touch-detector.libnotify = false;
+  # Notifications go out over org.freedesktop.Notifications, served by
+  # noctalia under niri and by gnome-shell under GNOME.
+  programs.yubikey-touch-detector = {
+    enable = true;
+    libnotify = false;
+  };
 
   systemd.user.services.yubikey-touch-notify = {
     description = "Show a critical notification while the YubiKey waits for a touch";
