@@ -75,4 +75,21 @@
   # effectively passwordless root, and the Fedora install this replaces used
   # `sudo docker` too. Keep that.
   virtualisation.docker.enable = true;
+
+  # --- User identity ---------------------------------------------------------
+  #
+  # Fedora gave brian a user-private group (brian:1000). NixOS's isNormalUser
+  # default would instead drop brian into the shared "users" group (gid 100).
+  # That would mean remapping ~39 GB of copied files, and -- more importantly --
+  # every group-readable file in the home directory would become readable by any
+  # other member of "users" rather than by brian alone. Pinning the private
+  # group preserves the permission model the data was written under.
+  #
+  # Host-scoped deliberately: judy is an existing install whose files already
+  # use the NixOS default, so this must NOT move into common.nix.
+  users.groups.brian.gid = 1000;
+  users.users.brian = {
+    group = "brian";
+    extraGroups = [ "users" ]; # keep the membership isNormalUser would have granted
+  };
 }
