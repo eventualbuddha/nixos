@@ -78,38 +78,43 @@
 
   # --- User identity ---------------------------------------------------------
   #
-  # Fedora gave brian a user-private group (brian:1000). NixOS's isNormalUser
-  # default would instead drop brian into the shared "users" group (gid 100).
-  # That would mean remapping ~39 GB of copied files, and -- more importantly --
-  # every group-readable file in the home directory would become readable by any
-  # other member of "users" rather than by brian alone. Pinning the private
-  # group preserves the permission model the data was written under.
+  # NixOS's isNormalUser default puts brian in the shared "users" group (gid
+  # 100). Keep a user-private group instead, as Fedora and most distributions
+  # do: with a shared primary group, every group-readable file in the home
+  # directory is readable by any other member of "users", which is a strictly
+  # worse default even on a single-user machine.
   #
   # Host-scoped deliberately: judy is an existing install whose files already
-  # use the NixOS default, so this must NOT move into common.nix.
+  # use the NixOS default, and changing it there would orphan their ownership.
   users.groups.brian.gid = 1000;
   users.users.brian = {
     group = "brian";
     extraGroups = [ "users" ]; # keep the membership isNormalUser would have granted
   };
 
-  # --- Rescue access ---------------------------------------------------------
+  # --- The old Fedora install, for reference ---------------------------------
   #
-  # Without this, a failed unlock lands in initrd emergency mode with
-  # "Cannot open access to console, the root account is locked" and there is no
-  # way in at all -- found by booting this install in a VM before cutting over.
+  # The second NVMe still holds the Fedora 44 system this replaced. Nothing was
+  # copied out of its home directory on purpose -- dotfiles written against
+  # /usr/bin paths do not belong on a system where home-manager owns that
+  # config -- so this mount is how to go and fetch a specific file when needed.
   #
-  # The initrd has no access to the real root's /etc/shadow, which is why this is
-  # a separate knob from root's password. `true` means a passwordless root shell
-  # if (and only if) the initrd fails. At that point the root filesystem is still
-  # encrypted, so there is nothing there to read.
-  #
-  # REVISIT BEFORE ENROLLING TPM2 (phase 7): once the TPM unlocks the disk
-  # automatically, PCRs match during a normal boot, so anyone who can provoke an
-  # initrd failure gets a root shell that can then ask the TPM for the key.
-  # Secure Boot + lanzaboote mitigates this (the kernel command line is part of
-  # the signed UKI, so emergency mode cannot simply be requested), but this
-  # should become a hashed password at that point. It is deliberately not one
-  # today because this flake is a public repo.
+  # ro:                it is the rollback target; nothing here should ever write to it.
+  # noauto+automount:  mounted on first access to /mnt/fedora, not at boot.
+  # nofail:            when this disk is eventually wiped and reused, its
+  #                    disappearance must not wedge the boot.
+  fileSystems."/mnt/fedora" = {
+    device = "/dev/disk/by-uuid/584cb26e-03fc-4d73-b2eb-1a24544133f8";
+    fsType = "btrfs";
+    options = [
+      "subvol=/" # top level, so both the root and home subvolumes are visible
+      "ro"
+      "nofail"
+      "noauto"
+      "x-systemd.automount"
+      "x-systemd.idle-timeout=60"
+    ];
+  };
+
   boot.initrd.systemd.emergencyAccess = true;
 }
