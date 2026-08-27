@@ -149,6 +149,10 @@
     packages = with pkgs; [
       #  thunderbird
     ];
+    openssh.authorizedKeys.keys = [
+      # 1Password key
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINBvZDmCn71NMskaJHNVGxvMHiwRvyF/SjA/hFgCkX2K"
+    ];
   };
 
   programs.ssh = {
