@@ -166,29 +166,39 @@
       # through work to this same name, which is why the alias is `vx` on every
       # machine rather than one name for local and another for remote.
       #
-      # ControlMaster/ControlPersist: keeps home/tunnels.nix's per-connection
-      # `ssh -W` forwards from renegotiating a full handshake every time a
-      # browser tab (re)connects to localhost:3000 -- the first one opens the
-      # real connection, later ones multiplex over it, and it's dropped after
-      # 10 minutes with no channels using it. Worth more still where `vx` goes
-      # through a jump host, since each new connection is otherwise two
-      # handshakes rather than one.
+      # ControlMaster/ControlPath: home/tunnels.nix's per-connection `ssh -W`
+      # forwards would otherwise renegotiate a full handshake every time a
+      # browser tab reconnects to localhost:3000 -- two of them where `vx` goes
+      # through the jump host. Sharing one connection makes a reconnect a new
+      # channel on an existing one instead.
       #
-      # The sharp edge of ControlMaster: interrupting an attempt that never
-      # authenticated -- Ctrl-C at an unexpected password prompt, a killed
-      # `ssh` -- can leave a backgrounded master parked on the ControlPath that
-      # never completed a handshake. It answers on the socket but can't open a
-      # session, so every later `ssh vx` blocks on it instead of failing. A
-      # clean auth failure leaves nothing behind; only an interrupted one does.
-      # `ssh -O check vx` says whether a master is there, `ssh -O exit vx`
-      # clears it.
+      # `no` rather than `auto`, though: `tunnel-frontend-master.service` is the
+      # only thing that creates the master, connecting with
+      # `-o ControlMaster=yes` and parking it on this ControlPath. Everything
+      # else -- the forwards and interactive `ssh vx` alike -- is purely a
+      # client, using that connection when it's there and making an ordinary one
+      # when it isn't (ssh falls back on its own if the ControlPath won't open).
+      #
+      # `auto` lets whoever arrives first own the socket, which put master
+      # setup and teardown inside the browser's request path; home/tunnels.nix
+      # has the failure that came of it. It also had a sharp edge for
+      # interactive use: interrupting an attempt that never authenticated --
+      # Ctrl-C at an unexpected password prompt, a killed `ssh` -- could leave a
+      # backgrounded master parked here that answered on the socket but could
+      # never open a session, so every later `ssh vx` blocked on it instead of
+      # failing. Nothing but the unit creates a master now, so neither happens.
+      # `ssh -O check vx` still says whether one is up, and
+      # `systemctl --user restart tunnel-frontend-master` replaces it.
+      #
+      # No ControlPersist: that governs how long an auto-started master lingers
+      # after its last client, and this master isn't auto-started -- it lives
+      # exactly as long as the unit does.
       Host vx
         HostName 192.168.124.179
         User vx
         ForwardAgent yes
-        ControlMaster auto
+        ControlMaster no
         ControlPath ~/.ssh/cm-%r@%h:%p
-        ControlPersist 10m
 
       # work itself, over Tailscale. Also the jump host `vx` goes through from
       # anywhere that isn't work.
