@@ -75,4 +75,6 @@
       '';
     })
   ];
+
+  virtualisation.containers.enable = true;
 }

@@ -80,6 +80,7 @@ in
       claude-code
       uv # python project/venv/interpreter management (pip/poetry/pyenv replacement)
       herdr
+      podman
     ];
 
     # `npm install -g` can't write into the Nix store (where nodejs_22 lives), so
@@ -167,4 +168,9 @@ in
   xdg.configFile."git/allowed_signers".text = lib.concatMapStrings (
     entry: "${lib.concatStringsSep "," entry.principals} ${entry.key}\n"
   ) (lib.attrValues signingKeys);
+
+  xdg.configFile."containers/registries.conf".text = ''
+    [registries.search]
+    registries = ['docker.io', 'quay.io']
+  '';
 }
