@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ pkgs, ... }:
 
 # NB: no `imports` here for niri's home-manager module. The NixOS module
 # (`programs.niri.enable = true;` in hosts/common.nix) already
@@ -263,6 +263,12 @@ in
           "ghostty"
           "-e"
           "yazi"
+        ];
+
+        "Mod+Comma".action.spawn = [
+          "noctalia"
+          "msg"
+          "notification-clear-active"
         ];
 
         "Mod+Q".action.close-window = [ ];
