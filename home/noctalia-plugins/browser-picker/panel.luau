@@ -18,7 +18,7 @@ local PROFILES = {
 -- pinned to the literal host it was written for.
 local AUTO_ROUTES = {
   { domain = "slack.com", profile = "VotingWorks" },
-  { domain = "github.com", pathPrefix = "/votingworks/", profile = "VotingWorks" },
+  { domain = "github.com", pathPrefix = "/votingworks", profile = "VotingWorks" },
   { domain = "bill.com", profile = "VotingWorks" },
 }
 
@@ -33,10 +33,17 @@ local function ruleMatchesDomain(domain, rule)
   return domain == rule.domain or domain:sub(-(#rule.domain + 1)) == "." .. rule.domain
 end
 
+-- True when path is exactly prefix, or prefix followed by "/..." -- so
+-- pathPrefix = "/votingworks" matches "/votingworks" and
+-- "/votingworks/repo", but not "/votingworks-foo".
+local function pathUnder(path, prefix)
+  return path == prefix or path:sub(1, #prefix + 1) == prefix .. "/"
+end
+
 local function matchAutoRoute(url, domain)
   local path = pathFromUrl(url)
   for _, rule in ipairs(AUTO_ROUTES) do
-    if ruleMatchesDomain(domain, rule) and (rule.pathPrefix == nil or path:sub(1, #rule.pathPrefix) == rule.pathPrefix) then
+    if ruleMatchesDomain(domain, rule) and (rule.pathPrefix == nil or pathUnder(path, rule.pathPrefix)) then
       return rule.profile
     end
   end
