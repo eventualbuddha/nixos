@@ -73,6 +73,12 @@ in
   home = {
     packages = with pkgs; [
       rustup
+      # nixpkgs' `rustup` bundles its own bin/rust-analyzer proxy (like
+      # cargo/rustc/etc, it just re-execs into `rustup`, which then errors
+      # with "could not choose a version" since no default toolchain is
+      # set). hiPrio makes the real rust-analyzer package win that filename
+      # collision in the merged profile instead.
+      (lib.hiPrio rust-analyzer)
       nodejs_22
       lazygit
       gcc
