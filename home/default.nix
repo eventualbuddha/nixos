@@ -14,6 +14,7 @@
     ./shell.nix
     ./tunnels.nix
     ./apps.nix
+    ./helium.nix
     ./theme.nix
   ];
 

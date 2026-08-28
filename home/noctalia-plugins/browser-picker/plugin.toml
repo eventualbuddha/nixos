@@ -1,0 +1,17 @@
+id = "brian/browser-picker"
+name = "Browser Picker"
+version = "1.0.0"
+plugin_api = 27
+author = "brian"
+license = "MIT"
+description = "Pick which Helium profile opens a link"
+
+[[panel]]
+id = "browser-picker"
+entry = "panel.luau"
+width = 460
+height = 172
+placement = "floating"
+position = "auto"
+keyboard_focus = "exclusive"
+capture_keys = ["1", "2"]

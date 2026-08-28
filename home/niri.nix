@@ -1,4 +1,11 @@
-{ pkgs, ... }:
+{ pkgs, osConfig, ... }:
+
+let
+  # The browser-picker Noctalia plugin (home/helium.nix) is judy-only --
+  # `osConfig` is home-manager's NixOS-module special arg for the host's
+  # full system config, always available without extra flake wiring.
+  isJudy = osConfig.networking.hostName == "judy";
+in
 
 # NB: no `imports` here for niri's home-manager module. The NixOS module
 # (`programs.niri.enable = true;` in hosts/common.nix) already
@@ -141,6 +148,17 @@ in
         XDG_CURRENT_DESKTOP = "niri";
       };
 
+      # Firefox/Helium request window activation via xdg-activation when a
+      # link is opened from another process (Slack, a terminal, an email
+      # client), but that request usually has no valid serial -- it wasn't
+      # triggered by input inside a niri-tracked surface. Niri's default
+      # policy for an invalid/missing serial is to mark the window urgent
+      # instead of focusing it, which is why links open without niri ever
+      # switching to them. This trusts those requests anyway. Single-user
+      # box, so the tradeoff (an app could self-focus more readily) is fine.
+      # See https://github.com/YaLTeR/niri/issues/2955.
+      debug.honor-xdg-activation-with-invalid-serial = [ ];
+
       window-rules = [
         {
           matches = [ { } ];
@@ -257,7 +275,19 @@ in
         ];
 
         "Mod+Return".action.spawn = [ "ghostty" ];
-        "Mod+B".action.spawn = [ "firefox" ];
+        # Browser profile picker on judy (a Noctalia panel plugin, see
+        # home/helium.nix); everywhere else, Helium has only one profile to
+        # open, so there's nothing to pick.
+        "Mod+B".action.spawn =
+          if isJudy then
+            [
+              "noctalia"
+              "msg"
+              "panel-toggle"
+              "brian/browser-picker:browser-picker" # <plugin id>:<panel entry id>
+            ]
+          else
+            [ "helium" ];
         "Mod+E".action.spawn = [ "nautilus" ];
         "Mod+Shift+E".action.spawn = [
           "ghostty"
