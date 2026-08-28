@@ -12,6 +12,32 @@
 
   networking.hostName = "judy";
 
+  # The i915 GuC flip worker (kworker/u:N+i915_flip) has been observed stuck
+  # in uninterruptible sleep for 10s+ at a time, stalling any client trying to
+  # submit a fresh frame (a new window's first paint, a full-screen redraw)
+  # while windows that don't need a new frame stay responsive -- e.g. niri
+  # itself keeps switching focus fine, but a new ghostty window or nvim
+  # starting up hangs for several seconds.
+  #
+  # `enable_psr=0` alone did not fix it -- caught live with `/proc/<pid>/stack`
+  # (see catch-i915-stall.sh in the chat that added this), and 580/850
+  # captures showed intel_atomic_commit_tail blocked in
+  # drm_atomic_helper_wait_for_flip_done (waiting on the *previous* flip's
+  # completion), versus only 4/850 waiting on a GPU render fence
+  # (dma_fence_wait_timeout). That points at the display engine itself being
+  # slow to signal flip-done, not PSR's link handshake or GPU rendering --
+  # the next suspect is DC5/DC6 display power-state transitions, a separate
+  # power-gating path from PSR. `enable_dc=0` disables those. Both flags cost
+  # idle power (screen-on idle draws more, though full suspend is unaffected)
+  # to trade for finding out which power-saving path is actually wedging the
+  # flip queue; once confirmed, narrow back down to whichever one alone fixes
+  # it (or, if it's `enable_dc`, to `enable_dc=1` for DC5-only rather than
+  # disabling it outright).
+  boot.kernelParams = [
+    "i915.enable_psr=0"
+    "i915.enable_dc=0"
+  ];
+
   # The vxsuite VM runs on work, on a libvirt network only work can route to,
   # so reach it by jumping through work. Everything else about the alias --
   # address, user, agent forwarding, connection multiplexing -- comes from the

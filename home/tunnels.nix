@@ -23,6 +23,17 @@
 # ProxyJump -- but the reason it's a separate unit rather than `ControlMaster
 # auto` is that it keeps master setup and teardown out of the request path.
 #
+# Pulled in on demand by `tunnel-frontend@`'s `Wants=`, not started at login:
+# the identity that authenticates to vx-host.ts is a touch-only YubiKey-backed
+# key, and an eagerly-started master with `Restart=always` reconnects in the
+# background every time the SSH connection drops -- which suspend does every
+# time, on its own timer, with no browser tab open to explain it. That turned
+# into the YubiKey blinking for a touch ~30s after every resume, for a
+# connection nobody had asked to make yet. `StopWhenUnneeded` closes the loop:
+# once nothing wants it (the last forward exited), systemd stops it too,
+# instead of leaving it running to silently reconnect -- and prompt -- on some
+# later resume.
+#
 # When each forward could become the master itself, a request that arrived while
 # a master was expiring found the socket still on disk, connected to it, and got
 # `mux_client_request_stdio_fwd: read from master failed: Broken pipe` -- ssh
@@ -75,7 +86,7 @@
       Restart = "always";
       RestartSec = 30;
     };
-    Install.WantedBy = [ "default.target" ];
+    Unit.StopWhenUnneeded = true;
   };
 
   systemd.user.services."tunnel-frontend@" = {
