@@ -152,6 +152,8 @@
     openssh.authorizedKeys.keys = [
       # 1Password key
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINBvZDmCn71NMskaJHNVGxvMHiwRvyF/SjA/hFgCkX2K"
+      # judy key
+      "sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIEulPeKr/e/wXjt/eyDyOrt0UodGzqndfWexz9Aa4v2JAAAABHNzaDo= brian@judy"
     ];
   };
 
