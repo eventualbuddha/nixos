@@ -11,7 +11,7 @@ _:
       fish_vi_key_bindings insert
     '';
     shellAliases = {
-      ls = "eza --icons --group-directories-first";
+      ls = "eza -l --icons --group-directories-first";
       ll = "eza -l --icons --group-directories-first";
       lt = "eza --tree --icons --group-directories-first";
       cat = "bat";
