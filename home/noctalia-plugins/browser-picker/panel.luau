@@ -11,6 +11,38 @@ local PROFILES = {
   { id = "VotingWorks", label = "VotingWorks", key = "2", color = "#6F42C1" },
 }
 
+-- URLs matching one of these open straight into the mapped profile -- the
+-- panel is never shown. Domain match includes subdomains (e.g.
+-- "workspace.slack.com" matches "slack.com") unless pathPrefix is set, in
+-- which case the domain must match exactly -- a path only makes sense
+-- pinned to the literal host it was written for.
+local AUTO_ROUTES = {
+  { domain = "slack.com", profile = "VotingWorks" },
+  { domain = "github.com", pathPrefix = "/votingworks/", profile = "VotingWorks" },
+  { domain = "bill.com", profile = "VotingWorks" },
+}
+
+local function pathFromUrl(url)
+  return url:match("^%a[%w+.-]*://[^/]+(.*)$") or ""
+end
+
+local function ruleMatchesDomain(domain, rule)
+  if rule.pathPrefix ~= nil then
+    return domain == rule.domain
+  end
+  return domain == rule.domain or domain:sub(-(#rule.domain + 1)) == "." .. rule.domain
+end
+
+local function matchAutoRoute(url, domain)
+  local path = pathFromUrl(url)
+  for _, rule in ipairs(AUTO_ROUTES) do
+    if ruleMatchesDomain(domain, rule) and (rule.pathPrefix == nil or path:sub(1, #rule.pathPrefix) == rule.pathPrefix) then
+      return rule.profile
+    end
+  end
+  return nil
+end
+
 local currentUrl = ""
 local currentDomain = ""
 local iconPath = nil
@@ -227,6 +259,15 @@ end
 function onOpen(context)
   currentUrl = context or ""
   currentDomain = domainFromUrl(currentUrl)
+
+  if currentDomain ~= "" then
+    local autoProfile = matchAutoRoute(currentUrl, currentDomain)
+    if autoProfile ~= nil then
+      openProfile(autoProfile)
+      return
+    end
+  end
+
   iconPath = nil
   iconNeedsBackdrop = false
   render()
