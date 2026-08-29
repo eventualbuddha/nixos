@@ -32,24 +32,31 @@ _:
   programs.home-manager.enable = true;
 
   # Standalone home-manager installs into ~/.nix-profile, and nothing on this
-  # Debian box puts that directory on PATH: /etc/fish/conf.d/nix.fish adds only
-  # the daemon's default profile (/nix/var/nix/profiles/default/bin), not the
-  # per-user one. Meanwhile every conf.d file this VM has accumulated --
-  # vite-plus, proto, moon, rustup, local-bin -- calls `fish_add_path` to put
-  # itself at the front.
+  # Debian box puts that directory on PATH early enough: /etc/fish/conf.d/nix.fish
+  # adds only the daemon's default profile, not the per-user one.
   #
-  # fish sources conf.d/*.fish before config.fish, and home-manager generates
-  # config.fish, so this runs last and wins. `-m` moves the entry to the front
-  # rather than skipping it if some other file already added it.
+  # This has to be a conf.d file rather than programs.fish.shellInit. fish
+  # sources conf.d/*.fish in name order and only then config.fish, which is what
+  # home-manager generates -- so anything set from shellInit lands after every
+  # hand-written conf.d file has already run. Several of those call the tools in
+  # question: zz-prompt.fish runs `starship init`, and uv.fish guards its
+  # completions on `type -q uv`. With the PATH fix in config.fish, the first
+  # failed loudly and the second silently stopped loading, because at conf.d
+  # time neither binary was on PATH yet.
   #
-  # Not in home/core/shell.nix because it is wrong on NixOS: there
-  # `useUserPackages` puts these packages in /etc/profiles/per-user/$USER/bin
-  # and ~/.nix-profile does not exist.
+  # The 00- prefix sorts it ahead of every other file in the directory, so the
+  # nix profile is on PATH before anything can look for a tool in it.
   #
-  # Without this the whole config silently does nothing useful: `nvim` still
-  # resolved to the hand-built 0.12.2 symlink in ~/.local/bin, and `rg`/`eza`
-  # to ~/.cargo/bin.
-  programs.fish.shellInit = ''
+  # `-m` moves the entry to the front if some other file already added it;
+  # vite-plus, proto, moon, rustup and local-bin all fish_add_path themselves
+  # there.
+  #
+  # Not in home/core because it is wrong on NixOS, where useUserPackages puts
+  # packages in /etc/profiles/per-user/$USER/bin and ~/.nix-profile does not
+  # exist.
+  xdg.configFile."fish/conf.d/00-nix-profile-path.fish".text = ''
+    # Managed by home-manager (hosts/vxdev/home.nix). See the comment there for
+    # why this is a conf.d file and not programs.fish.shellInit.
     fish_add_path -gm $HOME/.nix-profile/bin
   '';
 
