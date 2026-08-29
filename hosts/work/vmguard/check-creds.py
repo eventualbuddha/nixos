@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Print the guest's Claude Code credential expiry. Meant to be run IN THE GUEST, e.g.
-#   ssh vx python3 < scripts/check-creds.py
+#   ssh vx python3 < check-creds.py
 import json, time, os
 
 p = os.path.expanduser("~/.claude/.credentials.json")

@@ -121,8 +121,107 @@ is the one that matters interactively), and `/etc/apt/apt.conf.d/00-vmguard-prox
 only egress path there is; commenting them out looks exactly like a broken
 network.
 
-`hosts/work/vmguard/Justfile` came over from the Fedora setup. Its operational
-recipes still work -- `just denies`, `just gql-denies`, `just writes`,
-`just creds`, `just log` -- but its *install* recipes (`install`,
-`firewall-open`, `deploy`, `logrotate-install`) are superseded by this flake;
-editing the addon and re-applying is the deploy path now.
+### Changing the policy
+
+Edit `hosts/work/vmguard/egress_filter.py`, run the tests, then apply. That is the
+whole deploy -- the addon is staged into the Nix store by `vmguard.nix` and the
+unit's `ExecStart` names that store path, so an edit changes the path, which
+changes the unit, which makes the switch restart the service.
+
+```
+cd hosts/work/vmguard
+nix-shell -p python3 --run 'GH_PAT=dummy VMGUARD_DENYLOG=/tmp/t.log python3 tests/test_filter.py'
+cd ../../.. && ./apply.sh                    # sudo nixos-rebuild switch --flake .#work
+systemctl show vmguard-github -p ExecStart --value | grep -o 'egress_filter[^ ]*'
+```
+
+The tests are offline (they stub mitmproxy and mock the org resolver) and need a
+dummy `GH_PAT` only because the addon reads it at import. The last line confirms
+the running service picked up the new store path; compare it against
+`nix eval --raw '.#nixosConfigurations.work.config.systemd.services.vmguard-github.serviceConfig.ExecStart'`.
+
+Read `hosts/work/vmguard/NOTES.md` before widening anything -- it carries the
+rationale for every rule, and the deny log is the evidence a new rule should be
+built from.
+
+### Operating it
+
+The host has no system `python3` and no `just`; commands needing python go
+through `nix-shell -p python3`.
+
+```
+systemctl status vmguard-github                     # is it up?
+ss -ltn | grep 192.168.124.1:8080                   # is it listening?
+sudo journalctl -u vmguard-github -n 50             # service log (crashes, addon tracebacks)
+tail -n 30 /var/lib/vmguard/requests.log            # the request/deny log
+```
+
+**What got denied** -- the first thing to run when something in the guest "has no
+network". Hosts are collapsed and counted, with the noise we block on purpose
+filtered out (datadog telemetry, mcp-proxy, and loopback polls that should never
+have reached the proxy -- NOTES 15):
+
+```
+tail -n 1000 /var/lib/vmguard/requests.log | grep '"kind": "DENY"' \
+  | grep -oP '"host": "\K[^"]+' \
+  | grep -viE 'datadoghq|mcp-proxy|^localhost$|^127\.0\.0\.1$|^::1$' \
+  | sort | uniq -c | sort -rn
+```
+
+Same thing but only since the last restart, so stale pre-fix entries don't
+muddy the picture after a deploy:
+
+```
+awk -F'"' -v t="$(date -d "$(systemctl show vmguard-github -p ActiveEnterTimestamp --value)" +%Y-%m-%dT%H:%M:%S)" \
+    '/"kind": "DENY"/ && $4 >= t' /var/lib/vmguard/requests.log \
+  | grep -oP '"host": "\K[^"]+' | sort | uniq -c | sort -rn
+```
+
+**The audit trail** -- every allowed write: pushes, PR/issue/merge mutations, the
+CircleCI rerun, and anything that went out through an `OPEN_HOSTS` entry:
+
+```
+tail -n 1000 /var/lib/vmguard/requests.log | grep '"kind": "WRITE"'
+```
+
+**Denied GraphQL mutations**, grouped by the op and org that caused them -- what to
+read when deciding whether to widen `MUTATION_ALLOW`:
+
+```
+cd hosts/work/vmguard && nix-shell -p python3 --run './gql-denies.py'
+```
+
+**The guest's Claude credential expiry** (runs in the guest, over ssh):
+
+```
+ssh vx python3 < hosts/work/vmguard/check-creds.py
+```
+
+**Rotating a credential.** `secrets.env` is deliberately outside the repo and
+outside the store, so a switch never touches it. Edit it as root, then restart:
+
+```
+sudoedit /etc/vmguard/secrets.env && sudo systemctl restart vmguard-github
+```
+
+**Log rotation** is declarative (`services.logrotate` in `vmguard.nix`: daily,
+30 kept, forced at 100M). There is no `/etc/logrotate.d` on NixOS -- the config
+is a store path -- so to force a rotation now, run the timer's service:
+
+```
+sudo systemctl start logrotate.service
+```
+
+### A note on the old Fedora tooling
+
+This setup was ported from a Fedora install where it was a hand-rolled venv in
+`/opt` plus a unit dropped in `/etc/systemd/system`, driven by a `Justfile`. That
+Justfile was deleted in the NixOS port: `just` and `python3` are not installed
+here, every path it referenced (`artifacts/`, `install-host.sh`, `guest-setup.sh`,
+`mitmproxy-conf/`, `/opt/vmguard`) is gone, and its `deploy` recipe would have
+overwritten `/etc/systemd/system/vmguard-github.service` -- which NixOS now owns
+as a symlink into the store -- and quietly fought the next switch. Its useful
+recipes are the commands above. Its one-time install steps (`net-up`, `install`,
+`firewall-open`, `logrotate-install`) are now declared in `vmguard.nix`, and the
+guest-side steps (`guest-setup`, `move-nic`) were done once and live in the VM's
+disk image. `NOTES.md` keeps the full Fedora-era record.

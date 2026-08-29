@@ -1229,7 +1229,126 @@ needs doing, and how to back everything out.
     - **Deploy pending — `just deploy` (needs sudo)**, still the only step; nothing here touches
       secrets.
 
-## Running it: `Justfile`
+46. **Nix opened read-only — four hosts, install through package pulls (2026-08-28, on request).**
+    Deny-log evidence for the first step, and only the first step:
+    `{"ts": "2026-08-28T15:53:43", "kind": "DENY", "host": "nixos.org", "method": "GET",
+    "path": "/nix/install", "reason": "host not on allowlist"}` — a single 403 on
+    `curl --proto '=https' --tlsv1.2 -L https://nixos.org/nix/install | sh -s -- --daemon`,
+    the very first request the ask makes.
+
+    Opening `nixos.org` alone would have got a script and then failed on the next hop, the item
+    37 / item 45 shape all over again. So rather than discover the rest one 403 at a time, the
+    chain was walked end to end from the host first, and then the installer's own source was
+    read: `install-multi-user` and `install-systemd-multi-user.sh` were unpacked from the
+    tarball and grepped for every URL they contain. That is a **closed** list — the installer is
+    a shell script, so what it fetches is exactly what is written in it — which is why this went
+    in as four hosts at once and not as a first guess:
+
+    - **`nixos.org`** — the entry point and nothing else. `/nix/install` is a 302 to
+      `releases.nixos.org/nix/nix-2.35.2/install`; nothing else there is needed.
+    - **`releases.nixos.org`** — everything that is actually downloaded: that install script, the
+      27 MB binary tarball (`nix-2.35.2-x86_64-linux.tar.xz`) it fetches next, and every channel
+      snapshot's `nixexprs.tar.xz`.
+    - **`channels.nixos.org`** — the channel redirector. `/nixpkgs-unstable` 302s to a pinned
+      `releases.nixos.org/nixpkgs/nixpkgs-26.11pre…` snapshot. **This one is load-bearing for the
+      install, not just for later use:** `install-multi-user` line 718 writes
+      `https://channels.nixos.org/nixpkgs-unstable nixpkgs` into `~/.nix-channels` and then runs
+      `nix-channel --update nixpkgs` as its final step, so without it the install fails at the
+      finish line. It also serves `/flake-registry.json`, which bare flake refs resolve through.
+    - **`cache.nixos.org`** — the binary cache, i.e. the "pull and install packages" half:
+      `/nix-cache-info`, `<hash>.narinfo`, `/nar/*.nar.zst`. Verified to serve directly (Fastly
+      over S3, `server: AmazonS3`, no `Location` anywhere), so unlike cdimage there is no second
+      tier of mirror hosts hiding behind it.
+
+    **Why the read-only tier is the right fit, and not a compromise.** Nix's fetch path is GETs
+    and HEADs — no POST anywhere in it. The one write nix knows how to make is `nix copy --to`,
+    which PUTs store paths *out* to a cache, and a read-only entry is exactly what refuses it. So
+    this is one of the rare additions where the tier is not just the narrowest available but
+    genuinely the shape of the tool. A test pins the PUT-to-`cache.nixos.org` deny so that stays
+    true.
+
+    **Integrity is nix's own**, the apt/ISO story again: the install script carries the tarball's
+    sha256 inline (`hash=0c3960a9…`, checked against the download — it matches), and every
+    narinfo is signed `cache.nixos.org-1:` and verified against the key in nix's config. The gate
+    vouches for none of the bytes it passes.
+
+    **Flake refs need nothing new.** `github:NixOS/nixpkgs` resolves through `api.github.com` and
+    downloads from `codeload.github.com`, both of which have been open to reads on any repo since
+    the initial import.
+
+    **Deliberately NOT opened**, each its own ask: `search.nixos.org`, `nixos.wiki` and `nix.dev`
+    (doc sites — item 31's rule is to add them when one actually 403s, not ahead of it), any
+    `*.cachix.org` (third-party binary caches, whose contents arbitrary people upload; the
+    signature check does not make the *host* choice for you), and `install.determinate.systems`
+    (a different installer than the one that was asked for). All five are pinned as denies.
+
+    **Two guest-side gotchas that this file cannot fix, and that will look like proxy failures.**
+    Both are the `NODE_EXTRA_CA_CERTS` problem from the `downloads.claude.ai` comment, wearing a
+    different hat: these hosts are *bumped*, so anything that does not trust the MITM CA fails
+    TLS no matter what the allowlist says.
+    - **Nix ships its own CA bundle and pins it.** `setup_default_profile` in `install-multi-user`
+      checks `NIX_SSL_CERT_FILE`; if it is unset — which it is on a stock Debian guest — it
+      installs nix's `cacert` and exports
+      `NIX_SSL_CERT_FILE=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt`. That bundle
+      does **not** contain the MITM CA, so the installer's own closing `nix-channel --update`,
+      and everything after it, fails verification. Fix: `export
+      NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt` (the Debian bundle `guest-setup.sh`
+      put the CA into) *before* running the installer — set and existing and outside the store,
+      it takes all three branches of that check and is left alone.
+    - **The daemon is a separate process with a separate environment.** Multi-user nix does its
+      fetching in `nix-daemon`, under systemd, which inherits nothing from the shell. The proxy
+      half of this is already handled: `install-systemd-multi-user.sh` reads `https_proxy` /
+      `HTTPS_PROXY` / etc. out of the installing shell and writes them into
+      `/etc/systemd/system/nix-daemon.service.d/override.conf`, and the guest exports those from
+      `/etc/profile.d/vmguard.sh` — so run the installer from a normal login shell and the daemon
+      gets the proxy for free. It does **not** propagate the cert file, so add
+      `ssl-cert-file = /etc/ssl/certs/ca-certificates.crt` to `/etc/nix/nix.conf` (the daemon
+      reads it) or set it in that same override.
+
+    - Tests now 500 cases (+21): the install chain host by host, the channel redirect and
+      `flake-registry.json`, all three binary-cache request shapes plus a HEAD, POST/PUT denied on
+      each of the four hosts, no credentials injected, and the five denies above.
+    - **Deploy: `./apply.sh` from the flake root** (`sudo nixos-rebuild switch --flake .#work`).
+      NOT `just deploy` — that recipe is Fedora-era and dead on this machine (see the note under
+      "Running it" below). The addon is staged into the store by `vmguard.nix`, so editing this
+      repo changes its store path, which changes the unit's `ExecStart`, which changes the unit
+      file, which makes the switch restart `vmguard-github`. Nothing else to do; no secrets
+      change, and `/etc/vmguard/secrets.env` is untouched by a switch either way. Verify with
+      `systemctl show vmguard-github -p ExecStart --value` — the `egress_filter.py` store hash
+      should be the one `nix eval` prints for the new build.
+
+## Running it: `Justfile` (RETIRED)
+
+> **THE JUSTFILE IS GONE, DELETED IN THE NIXOS PORT (2026-08-28).** This section, and the two
+> after it, describe the **Fedora** install this machine replaced -- a venv in `/opt`, a unit in
+> `/etc/systemd/system`, and `just` driving both. They are kept as the record of how things got
+> here, not as instructions. Nothing below is runnable on this box.
+>
+> **Where it all went:** the day-to-day commands are in `README.md` under "VMGuard" -- deploying
+> a policy change, the deny/write log queries, credential rotation, forcing a log rotation. The
+> one recipe with real logic, `gql-denies`, became `gql-denies.py` next to the addon.
+>
+> The short version, if you only read one line: **to apply an addon change, run `./apply.sh`
+> from the flake root.** `vmguard.nix` stages `egress_filter.py` into the store and the unit's
+> `ExecStart` names that store path, so an edit changes the path, changes the unit, and systemd
+> restarts the service. There is no copy step.
+>
+> Why the Justfile could not simply be kept: `just` is not installed here and neither is
+> `python3`; every path it referenced is gone (`artifacts/`, `install-host.sh`, `guest-setup.sh`,
+> `mitmproxy-conf/`, `scripts/`, `/opt/vmguard`); and `deploy` would have overwritten
+> `/etc/systemd/system/vmguard-github.service`, which NixOS now owns as a **symlink into the
+> store**. That last one is the dangerous one -- it would have worked, looked fine, and then been
+> silently reverted by the next switch. Exactly the unit-drift failure of item 11, one layer up.
+>
+> The one-time setup recipes are all either done or now declarative: `net-up` (libvirt, done),
+> `install` (the whole unit is `vmguard.nix`), `firewall-open` (firewalld is gone; the port is
+> `networking.firewall.interfaces."virbr-guard"`), `logrotate-install` (`services.logrotate` in
+> the same file), `guest-setup` / `move-nic` (done once, and the guest half lives in the VM's
+> disk image, not here), `backout` (would restore a Fedora system that no longer exists).
+>
+> **Still manual, still outside the store, and untouched by any switch:**
+> `/etc/vmguard/secrets.env` and `/var/lib/vmguard/mitmproxy-conf/` -- see the header of
+> `vmguard.nix` for why the CA in particular must be preserved rather than regenerated.
 
 A `Justfile` wraps the install/setup/ops commands (run `just` from this dir to list them;
 needs `just`, already at `~/.cargo/bin/just`). Setup order: `preflight` → `net-up` →

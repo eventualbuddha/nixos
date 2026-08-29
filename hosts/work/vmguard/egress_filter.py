@@ -26,8 +26,10 @@
 #   4. handlers/dispatch — one handler per host family, plus the catch-all deny
 #
 # Two rules for editing this file: fail closed on anything unrecognized, and widen from evidence
-# in the deny log (`just denies`, `just gql-denies`) rather than from a guess. Every rule below
-# has a NOTES.md item explaining what forced it. Tests: `just test` (offline, no mitmproxy).
+# in the deny log (README.md "Operating it" has the queries; ./gql-denies.py names a denied
+# GraphQL op) rather than from a guess. Every rule below has a NOTES.md item explaining what
+# forced it. Tests: tests/test_filter.py, offline; the README has the nix-shell invocation,
+# since this host has no system python.
 import os, re, json, base64, time, pathlib, logging, urllib.request
 from mitmproxy import http
 
@@ -78,7 +80,7 @@ AUTH = "Basic " + base64.b64encode(f"x-access-token:{PAT}".encode()).decode()
 # GraphQL mutation operations we permit (lower-cased, matched against the top-level selection
 # field name). Deliberately PR/issue-scoped: no deleteRepository, no org/repo settings, no ref
 # deletion (the one destructive exception is the narrow REST branch-cleanup rule below).
-# Widen from the deny log as concrete needs appear — `just gql-denies` names the op.
+# Widen from the deny log as concrete needs appear — ./gql-denies.py names the op.
 MUTATION_ALLOW = {
     "createpullrequest", "updatepullrequest", "closepullrequest", "reopenpullrequest",
     "markpullrequestreadyforreview", "convertpullrequesttodraft",
@@ -716,6 +718,49 @@ READ_ONLY_HOSTS = {"api.mason-registry.dev", "downloads.claude.ai", "herdr.dev",
                    # because a read-only entry could not have constrained it anyway. See the
                    # comment on that entry and NOTES 42.
                    "getmoshi.app", "cdn.getmoshi.app",
+
+                   # Nix, on request (NOTES 46). nixos.org 403'd in the deny log; the rest of
+                   # the chain was walked ahead of its own 403s rather than one at a time. The
+                   # whole flow — installing with
+                   # `curl … https://nixos.org/nix/install | sh -s -- --daemon`, then
+                   # pulling and installing packages — is these four hosts and nothing else, all
+                   # GET/HEAD, so this tier fits it exactly. Nix never POSTs in the fetch path;
+                   # the one write it knows how to do is `nix copy --to`, pushing store paths OUT
+                   # to a cache, and a read-only entry is precisely what refuses it.
+                   #
+                   #   nixos.org           the install entry point (/nix/install) and nothing
+                   #                       else — it 302s straight to releases.nixos.org.
+                   #   releases.nixos.org  where everything downloadable actually lives: the
+                   #                       install script the redirect lands on, the ~27 MB
+                   #                       binary tarball it then fetches, and every channel
+                   #                       snapshot's nixexprs.tar.xz.
+                   #   channels.nixos.org  the redirector `nix-channel --update` walks
+                   #                       (/nixpkgs-unstable -> a releases.nixos.org snapshot).
+                   #                       The installer writes this exact URL into
+                   #                       ~/.nix-channels and updates it as its last step, so an
+                   #                       install fails at the finish line without it. Also
+                   #                       /flake-registry.json, which bare flake refs resolve
+                   #                       through.
+                   #   cache.nixos.org     the binary cache: /nix-cache-info, <hash>.narinfo and
+                   #                       /nar/*.nar.zst. This is the "installing packages"
+                   #                       half. It serves directly (Fastly over S3, no
+                   #                       redirect), and nix HEADs as well as GETs here.
+                   #
+                   # Integrity is nix's own, the same story as apt and the Debian ISOs: the
+                   # install script carries the tarball's sha256 inline, and every narinfo is
+                   # signed by cache.nixos.org-1 and checked against the key in nix's own config.
+                   # The gate vouches for none of the bytes.
+                   #
+                   # Flake refs like `github:NixOS/nixpkgs` need nothing new here —
+                   # api.github.com and codeload.github.com reads have always been open to any
+                   # repo.
+                   #
+                   # NOT opened, and each a separate ask: search.nixos.org, nixos.wiki and
+                   # nix.dev (docs, per the item 31 rule — add them when one actually 403s), any
+                   # *.cachix.org (third-party caches, written by arbitrary uploaders), and
+                   # install.determinate.systems (a different installer than the one asked for).
+                   "nixos.org", "releases.nixos.org",
+                   "channels.nixos.org", "cache.nixos.org",
                    }
 
 # Exact POST paths permitted on a READ_ONLY_HOSTS host, as {host: {paths}}. Everything else on
@@ -798,7 +843,7 @@ OPEN_HOSTS = {
               # events and only honouring decisions for action ids it raised itself, which is the
               # daemon's own logic and not something this gate enforces.
               #
-              # Logged as open_host: true, so the handshake lands in `just writes` — but only the
+              # Logged as open_host: true, so the handshake lands in the WRITE audit trail — but only the
               # handshake. Frame traffic after the upgrade is invisible here by construction.
               "api.getmoshi.app"}
 
@@ -1073,7 +1118,7 @@ def _handle_read_only(flow):
 
 def _handle_open(flow):
     """Fully-open host (OPEN_HOSTS): every method allowed, no creds injected, every request
-    logged. Non-read methods are recorded as WRITE so they show up in `just writes` next to the
+    logged. Non-read methods are recorded as WRITE so they show up in the audit trail next to the
     GitHub audit trail — if data ever leaves this way, the log is the only thing that will
     show it, so nothing here is silent."""
     kind = "READ" if flow.request.method in API_READ_METHODS else "WRITE"

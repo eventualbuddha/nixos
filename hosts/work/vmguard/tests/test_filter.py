@@ -2,7 +2,8 @@
 """Offline unit tests for egress_filter.py.
 
 No mitmproxy install and no network needed: we stub the `mitmproxy` module and mock the
-node-ID -> org resolver. Run via `just test` or `python3 tests/test_filter.py`.
+node-ID -> org resolver. The host has no system python, so run it through nix-shell:
+  nix-shell -p python3 --run 'GH_PAT=dummy VMGUARD_DENYLOG=/tmp/t.log python3 tests/test_filter.py'
 """
 import types, sys, json, os, importlib.util
 
@@ -851,6 +852,38 @@ check("cd/acc_parent",       gh("/x", "GET", host="acc.umu.se"), "deny")
 check("cd/accum_se",         gh("/x", "GET", host="mirror.accum.se"), "deny")
 check("cd/ac2_alias",        gh("/x", "GET", host="laotzu.ftp.ac2.se"), "deny")
 check("cd/unlisted_backend", gh("/x", "GET", host="caesar.ftp.acc.umu.se"), "deny")
+
+# ---- nix (NOTES 46) ----
+# Install: nixos.org is the entry point and 302s to releases.nixos.org, which serves both the
+# script the redirect lands on and the binary tarball that script fetches.
+check("nix/install_entry",   gh("/nix/install", "GET", host="nixos.org"), "allow")
+check("nix/install_script",  gh("/nix/nix-2.35.2/install", "GET", host="releases.nixos.org"), "allow")
+check("nix/install_tarball", gh("/nix/nix-2.35.2/nix-2.35.2-x86_64-linux.tar.xz", "GET", host="releases.nixos.org"), "allow")
+# Channels: the installer's last step, and what every later `nix-channel --update` walks.
+check("nix/channel_redir",   gh("/nixpkgs-unstable", "GET", host="channels.nixos.org"), "allow")
+check("nix/channel_expr",    gh("/nixpkgs/nixpkgs-26.11pre1062790.c27cdad491a9/nixexprs.tar.xz", "GET", host="releases.nixos.org"), "allow")
+check("nix/flake_registry",  gh("/flake-registry.json", "GET", host="channels.nixos.org"), "allow")
+# The binary cache — the three request shapes nix makes, and the HEAD it uses to probe existence.
+check("nix/cache_info",      gh("/nix-cache-info", "GET", host="cache.nixos.org"), "allow")
+check("nix/cache_narinfo",   gh("/31dr55fb8a67a91hvhhv259k5wwmvm1b.narinfo", "GET", host="cache.nixos.org"), "allow")
+check("nix/cache_nar",       gh("/nar/0yd3lg4nyfnkcs84ij0kz0falh26lw908b0pakxfbzcy46rjns45.nar.zst", "GET", host="cache.nixos.org"), "allow")
+check("nix/cache_head",      gh("/31dr55fb8a67a91hvhhv259k5wwmvm1b.narinfo", "HEAD", host="cache.nixos.org"), "allow")
+# Read-only and credential-free, like every other entry in the tier. The PUT is the one that
+# matters: that is the shape `nix copy --to` uses to push store paths OUT, so pin it denied.
+check("nix/cache_put",       gh("/31dr55fb8a67a91hvhhv259k5wwmvm1b.narinfo", "PUT", host="cache.nixos.org"), "deny")
+check("nix/cache_post",      gh("/nar/x.nar.zst", "POST", host="cache.nixos.org"), "deny")
+check("nix/releases_post",   gh("/nix/x", "POST", host="releases.nixos.org"), "deny")
+check("nix/channels_post",   gh("/nixpkgs-unstable", "POST", host="channels.nixos.org"), "deny")
+check("nix/cache_no_creds",  hdrs("/nix-cache-info", "GET", "cache.nixos.org"), {})
+check("nix/nixos_no_creds",  hdrs("/nix/install", "GET", "nixos.org"), {})
+# Still exact hosts: the neighbouring nixos.org names are not suffix-matched, and the docs sites
+# follow the item 31 rule (added on a real 403, not ahead of one).
+check("nix/search_denied",   gh("/", "GET", host="search.nixos.org"), "deny")
+check("nix/wiki_denied",     gh("/wiki/Main_Page", "GET", host="nixos.wiki"), "deny")
+check("nix/nixdev_denied",   gh("/manual/nix/stable/", "GET", host="nix.dev"), "deny")
+# A third-party cache and a different installer: each its own decision, neither part of the ask.
+check("nix/cachix_denied",   gh("/x.narinfo", "GET", host="nix-community.cachix.org"), "deny")
+check("nix/detsys_denied",   gh("/nix", "GET", host="install.determinate.systems"), "deny")
 
 try:
     os.remove(os.environ["VMGUARD_DENYLOG"])
