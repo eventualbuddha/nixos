@@ -17,7 +17,7 @@
 #
 # Apply with:
 #   nix run home-manager/master -- switch --flake ~/nixos#vx@vxdev
-_:
+{ config, ... }:
 
 {
   imports = [
@@ -34,6 +34,70 @@ _:
   };
 
   programs.home-manager.enable = true;
+
+  # Let home-manager own bash too, so this VM's shell environment comes from the
+  # flake whichever shell is in use. fish has been fully declared for a while;
+  # bash was the last hand-written surface, and it was carrying four lines that
+  # had quietly become redundant plus two that had not.
+  #
+  # What the hand-written files were still doing, and what happens to each:
+  #
+  #   ~/.local/bin on PATH        kept -- now via home.sessionPath (declared in
+  #                               home/core/claude-code.nix), which home-manager
+  #                               writes into hm-session-vars.sh and this module
+  #                               finally sources. Without it `claude` and
+  #                               `moshi-hook` are simply missing: they are the
+  #                               two tools nix bootstraps rather than packages.
+  #   vmguard proxy               kept, below. /etc/profile.d is read by login
+  #                               shells only, so ~/.bashrc is the only thing
+  #                               covering non-login interactive ones -- without
+  #                               it those shells have no egress at all.
+  #   . ~/.vite-plus/env          dropped. vite-plus and its proxies (node,
+  #   . ~/.cargo/env              pnpm, ...) and rustup now come from
+  #                               home/core/dev-tools.nix, so these only served
+  #                               to prepend the old self-installed copies ahead
+  #                               of the nix ones. Removing them is what makes
+  #                               bash resolve them the way fish already does.
+  #   ~/bin, ~/.bash_aliases      Debian defaults guarding paths that do not
+  #                               exist here; home-manager does not recreate
+  #                               them and nothing notices.
+  #
+  # ~/.nix-profile/bin itself needs no help here, unlike in fish: the nix
+  # installer put a nix-daemon.sh source line in /etc/bash.bashrc and
+  # /etc/profile.d/nix.sh, which covers non-login and login bash respectively.
+  programs.bash = {
+    enable = true;
+
+    # bashrcExtra rather than initExtra: this needs to apply to every bash, not
+    # just interactive ones, since a non-interactive shell that reaches the
+    # network needs the proxy just as much.
+    bashrcExtra = ''
+      # Egress from this guest goes through the vmguard proxy on `work`. The
+      # fish half of this is hosts/vxdev/fish/20-vmguard.fish; guest-setup.sh
+      # writes the file being sourced.
+      [ -f /etc/profile.d/vmguard.sh ] && . /etc/profile.d/vmguard.sh
+
+      # hm-session-vars.sh carries home.sessionPath (~/.local/bin, i.e. claude
+      # and moshi-hook) and EDITOR/VISUAL, but home-manager sources it only from
+      # ~/.profile -- which non-login interactive shells never read. Without
+      # this, `claude` is missing in exactly those shells and present in login
+      # ones, which is a miserable thing to debug. The script self-guards on
+      # __HM_SESS_VARS_SOURCED, so sourcing it from both places is a no-op the
+      # second time.
+      . "${config.home.profileDirectory}/etc/profile.d/hm-session-vars.sh"
+    '';
+
+    # Debian's stock ~/.profile sources ~/.bashrc when the shell is bash;
+    # home-manager's generated one does not. Without this a login shell gets
+    # hm-session-vars and nothing else -- no prompt, no completions, no direnv,
+    # no zoxide -- while non-login interactive shells get all of it, which is a
+    # confusing split to debug. This restores what Debian did.
+    profileExtra = ''
+      if [ -n "$BASH_VERSION" ] && [ -f "$HOME/.bashrc" ]; then
+        . "$HOME/.bashrc"
+      fi
+    '';
+  };
 
   # This VM's fish configuration, all of it. What used to be a pile of
   # hand-copied files in ~/.config/fish/conf.d is now declared here, so a
