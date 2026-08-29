@@ -89,6 +89,48 @@ Authentication Key -- GitHub treats those as distinct roles). Every machine
 trusts every key in that list, which is what lets `git log --show-signature`
 verify commits made on the other machine.
 
+## Bootstrapping a new vxsuite VM
+
+A fresh Debian 12 guest with nothing on it but a `vx` user becomes a working
+build VM with one command, run inside the guest:
+
+```
+curl -fsSL https://raw.githubusercontent.com/eventualbuddha/nixos/main/bootstrap-vm.sh | bash
+```
+
+`bootstrap-vm.sh` does the eight things that are otherwise hand-work: passwordless
+sudo, apt prerequisites, the multi-user nix install, flakes, the nix-daemon proxy
+drop-in, cloning this repo, and activating `homeConfigurations."vx@vxdev"`. It is
+idempotent -- re-running it on a configured box changes nothing -- and `CHECK=1`
+prints what each step would do without touching anything.
+
+Two things about it are worth knowing before you use it.
+
+**Where it goes in the vmguard order.** The provisioning sequence in
+`hosts/work/vmguard/Justfile` is `net-up → install → firewall-open → guest-setup
+→ move-nic`, and this script goes anywhere after **`guest-setup`** -- either side
+of `move-nic`. Everything it fetches is allowlisted read-only: the four nixos.org
+hosts (NOTES 46), `deb.debian.org` and `security.debian.org` for apt, and
+`github.com` for the clone. The hard rule is that `guest-setup` must come first
+if the guest is already on the isolated net, since without the MITM CA and the
+proxy env it writes there is no egress at all. The script checks reachability
+before running the nix installer, so that case fails with a reason rather than as
+a download timeout.
+
+**The nix-daemon proxy drop-in.** On a multi-user install the *daemon* does all
+substituter traffic, and systemd units inherit nothing from the shell -- so behind
+vmguard, every user-side proxy variable can be perfectly correct and nix still
+cannot reach the binary cache. `/etc/systemd/system/nix-daemon.service.d/override.conf`
+is what fixes it. The existing VM has had that file since its own setup, written
+by hand and recorded nowhere; the script is now where it lives.
+
+What the script deliberately does **not** do is the vmguard guest side -- the MITM
+CA into the trust store, `/etc/profile.d/vmguard.sh`, the apt proxy config. That
+is `guest-setup.sh` on `work` (`just guest-setup`), it needs the CA off the host,
+and that key does not belong in this repo. The script detects whether it has run
+and adapts. Still by hand afterwards: `claude /login`, `just move-nic`, and
+cloning vxsuite into `~/code/vxsuite`.
+
 ## VMGuard: the vxsuite VM's egress proxy (work only)
 
 The vxsuite guest sits on an isolated libvirt network (`vmguard`) with no route
