@@ -62,6 +62,15 @@ in
     procs # nicer `ps`
     jq # JSON processor
 
+    # Previously `cargo install`ed into ~/.cargo/bin, where they shadowed the
+    # nix profile in bash and needed updating by hand.
+    hyperfine # benchmarking
+    xh # nicer `curl` for HTTP APIs
+    tealdeer # `tldr` -- community cheatsheets for common commands
+    ripunzip # parallel unzip
+    tree-sitter
+    tuicr # code review TUI
+
     # Agent tooling. claude-code is deliberately absent -- see
     # ./claude-code.nix for why it is bootstrapped rather than installed.
     uv # python project/venv/interpreter management (pip/poetry/pyenv replacement)
