@@ -13,6 +13,7 @@ _:
   imports = [
     ./shell.nix
     ./cli.nix
+    ./claude-code.nix
     ./editor.nix
     ./git.nix
   ];

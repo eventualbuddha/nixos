@@ -62,8 +62,8 @@ in
     procs # nicer `ps`
     jq # JSON processor
 
-    # Agent tooling
-    claude-code
+    # Agent tooling. claude-code is deliberately absent -- see
+    # ./claude-code.nix for why it is bootstrapped rather than installed.
     uv # python project/venv/interpreter management (pip/poetry/pyenv replacement)
     herdr
   ];
