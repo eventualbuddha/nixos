@@ -20,7 +20,12 @@
 _:
 
 {
-  imports = [ ../../home/core ];
+  imports = [
+    ../../home/core
+    # moshi-hook is wanted here and on work, but not on judy -- so it is
+    # imported per-host rather than living in home/core or home/desktop.
+    ../../home/moshi.nix
+  ];
 
   home = {
     username = "vx";

@@ -136,4 +136,12 @@
   # key generated on this host is listed under both principals in
   # home/dev.nix, so commits from either address still verify everywhere.
   home-manager.users.brian.programs.git.settings.user.email = "brian@voting.works";
+
+  # --- moshi-hook ------------------------------------------------------------
+  #
+  # Wanted on this machine and on the vxsuite guest, but not on judy, so it is
+  # imported here rather than from home/ (which is judy+work) or home/core
+  # (every machine). See home/moshi.nix for why it is bootstrapped rather than
+  # packaged.
+  home-manager.users.brian.imports = [ ../../home/moshi.nix ];
 }
