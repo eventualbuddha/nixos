@@ -49,6 +49,16 @@
       # on that machine) and adding one line below: `<name> = mkHost "<name>";`.
       # Everything shared (niri/ghostty/noctalia/home-manager/etc.) comes from
       # hosts/common.nix and home/ automatically.
+      # Plain nixpkgs instance for the outputs that are not a nixosSystem
+      # (standalone home-manager): there is no NixOS around to inherit
+      # `nixpkgs.config` from, so allowUnfree has to be set here.
+      pkgsFor =
+        system:
+        import nixpkgs {
+          inherit system;
+          config.allowUnfree = true;
+        };
+
       mkHost =
         name:
         nixpkgs.lib.nixosSystem {
@@ -65,6 +75,18 @@
       nixosConfigurations = {
         judy = mkHost "judy";
         work = mkHost "work";
+      };
+
+      # Standalone home-manager, for machines that are not NixOS. `vx` is the
+      # Debian 12 VM vxsuite is built in -- Debian on purpose, since that is
+      # what VotingWorks ships on and parts of the repo assume it. It gets
+      # home/core (the portable half) and none of home/desktop.
+      #
+      #   nix run home-manager/master -- switch --flake ~/nixos#vx@vxdev
+      homeConfigurations."vx@vxdev" = home-manager.lib.homeManagerConfiguration {
+        pkgs = pkgsFor "x86_64-linux";
+        extraSpecialArgs = { inherit inputs; };
+        modules = [ ./hosts/vxdev/home.nix ];
       };
     };
 }
