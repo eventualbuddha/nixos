@@ -30,6 +30,9 @@
     # moshi-hook is wanted here and on work, but not on judy -- so it is
     # imported per-host rather than living in home/core or home/desktop.
     ../../home/moshi.nix
+    # vite-plus: vxdev only, because its managed node/pnpm runtimes are musl
+    # builds that cannot exec on NixOS. See the header of that file.
+    ../../home/vite-plus.nix
   ];
 
   home = {
