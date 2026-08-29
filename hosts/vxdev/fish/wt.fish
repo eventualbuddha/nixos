@@ -49,7 +49,7 @@ function __wt_help
     echo "                                          If <branch> exists locally or on a remote, it is"
     echo "                                          checked out; otherwise it is created from <base>"
     echo "                                          (default: main)"
-    echo "                                          Runs mise trust, pnpm install, and pnpm build"
+    echo "                                          Runs pnpm install and pnpm build"
     echo "                                          With --rebase, rebase on main before building"
     echo "                                          If a worktree already exists, just cd into it"
     echo "  rm|remove [name] [-f|--force]           Remove a worktree (defaults to current directory)"
@@ -244,10 +244,6 @@ function __wt_rebase_main --description "Rebase the worktree at PATH onto the la
 end
 
 function __wt_build --description "Install dependencies and build the worktree in the current directory"
-    if type -q mise
-        mise trust
-    end
-
     pnpm install
     and pnpm build
 end
