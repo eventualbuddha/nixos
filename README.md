@@ -1,9 +1,9 @@
 # nixos
 
-Personal NixOS flake. Primary desktop is [niri](https://github.com/niri-wm/niri)
+Personal NixOS flake. The desktop is [niri](https://github.com/niri-wm/niri)
 (scrollable-tiling Wayland compositor) + [ghostty](https://ghostty.org/) +
-[noctalia](https://github.com/noctalia-dev/noctalia) (shell/bar/launcher), with
-GNOME + GDM kept fully intact as a fallback session -- pick either at login.
+[noctalia](https://github.com/noctalia-dev/noctalia) (shell/bar/launcher). GNOME
+and GDM are also installed, and GDM lists both sessions at login.
 
 Loosely inspired by [ctknightdev/nixos](https://github.com/ctknightdev/nixos),
 rebuilt from scratch for this hardware/setup rather than adapted from it.
@@ -14,20 +14,16 @@ rebuilt from scratch for this hardware/setup rather than adapted from it.
 flake.nix
 hosts/
   common.nix              # shared system config across every machine
-  <hostname>/
-    configuration.nix     # host-specific: just hostname + hardware quirks
-    hardware-configuration.nix   # from `nixos-generate-config` on that machine
-home/                     # home-manager, user "brian", shared across hosts
-  niri.nix                # compositor settings, keybinds, window rules
-  noctalia.nix            # shell/bar config
-  terminal.nix            # ghostty
-  editor.nix              # neovim + LazyVim bootstrap
-  dev.nix                 # git/signing + rust/node/dev CLI tooling
-  shell.nix               # fish + starship
-  apps.nix                # browsers, chat, CLI utilities
-  theme.nix               # gtk/cursor theme
-  tunnels.nix             # socket-activated SSH forwards
+  <hostname>/             # host-specific: hostname, hardware quirks, overrides
+home/                     # home-manager for "brian"
+  core/                   # portable: shell, editor, git, CLI tooling
+  desktop/                # niri, noctalia, ghostty, GUI apps, theming
+  toolchains.nix          # ambient language toolchains (judy + work only)
 ```
+
+`home/core` is the half that has no NixOS modules behind it, which is what lets
+the standalone `vx@vxdev` config import it on Debian. `home/desktop` assumes
+NixOS and a graphical session.
 
 Adding a new machine: run `nixos-generate-config`, drop the two files under
 `hosts/<name>/`, add `<name> = mkHost "<name>";` in `flake.nix`. Everything in
@@ -43,19 +39,16 @@ sudo nixos-rebuild switch --flake .#<host>    # or: ./apply.sh
 `./apply.sh` builds the host it is run on. Pass a name (`./apply.sh judy`) to
 build a different one.
 
-## If niri doesn't work out
+## Recovery
 
-1. **Easiest**: log out, and on the GDM login screen pick "GNOME" from the
-   session dropdown instead of "niri". Nothing about GNOME/GDM is touched by
-   this config -- it's the exact same session that was there before.
-2. **If GDM itself won't come up**: reboot, and at the systemd-boot menu pick
-   an earlier generation (on judy, that includes the ones from before niri was
-   ever added).
-3. **judy only**: plain `sudo nixos-rebuild switch` (no `--flake` flag) run from
-   `/etc/nixos` still rebuilds the original, untouched, GNOME-only
-   `/etc/nixos/configuration.nix` as a manual last resort, entirely independent
-   of this flake. Machines installed straight from this flake (work) have no
-   such file -- `/etc/nixos` is empty there, so only 1 and 2 apply.
+1. **A broken graphical session**: log out and pick "GNOME" from the session
+   dropdown at the GDM login screen. Both sessions are always built, so this
+   needs no rebuild.
+2. **GDM itself won't come up**: reboot and pick an earlier generation from the
+   systemd-boot menu. `work` caps that menu at 10 entries
+   (`boot.loader.systemd-boot.configurationLimit`); older generations stay in
+   the store either way and are reachable with
+   `sudo nixos-rebuild switch --rollback`.
 
 ## YubiKey (sudo / polkit)
 
@@ -83,7 +76,7 @@ Setting up a new machine:
 ssh-keygen -t ed25519-sk -f ~/.ssh/id_ed25519_sign_sk -C "<email> (git signing, <host>)"
 ```
 
-Then add the `.pub` line to `signingKeys` in `home/dev.nix` and re-apply, and
+Then add the `.pub` line to the `keys` set in `home/core/signing-keys.nix` and re-apply, and
 register it at https://github.com/settings/keys as a **Signing Key** (not an
 Authentication Key -- GitHub treats those as distinct roles). Every machine
 trusts every key in that list, which is what lets `git log --show-signature`
@@ -106,16 +99,13 @@ prints what each step would do without touching anything.
 
 Two things about it are worth knowing before you use it.
 
-**Where it goes in the vmguard order.** The provisioning sequence in
-`hosts/work/vmguard/Justfile` is `net-up → install → firewall-open → guest-setup
-→ move-nic`, and this script goes anywhere after **`guest-setup`** -- either side
-of `move-nic`. Everything it fetches is allowlisted read-only: the four nixos.org
-hosts (NOTES 46), `deb.debian.org` and `security.debian.org` for apt, and
-`github.com` for the clone. The hard rule is that `guest-setup` must come first
-if the guest is already on the isolated net, since without the MITM CA and the
-proxy env it writes there is no egress at all. The script checks reachability
-before running the nix installer, so that case fails with a reason rather than as
-a download timeout.
+**Where it goes in the vmguard order.** Run it only after the guest has vmguard's
+MITM CA and proxy environment -- without those there is no egress at all and every
+fetch hangs. Either side of moving the guest onto the isolated network is fine.
+Everything it fetches is allowlisted read-only: the four nixos.org hosts (NOTES
+46), `deb.debian.org` and `security.debian.org` for apt, and `github.com` for the
+clone. The script checks reachability before running the nix installer, so a
+too-early run fails with a reason rather than as a download timeout.
 
 **The nix-daemon proxy drop-in.** On a multi-user install the *daemon* does all
 substituter traffic, and systemd units inherit nothing from the shell -- so behind
@@ -125,11 +115,11 @@ is what fixes it. The existing VM has had that file since its own setup, written
 by hand and recorded nowhere; the script is now where it lives.
 
 What the script deliberately does **not** do is the vmguard guest side -- the MITM
-CA into the trust store, `/etc/profile.d/vmguard.sh`, the apt proxy config. That
-is `guest-setup.sh` on `work` (`just guest-setup`), it needs the CA off the host,
-and that key does not belong in this repo. The script detects whether it has run
-and adapts. Still by hand afterwards: `claude /login`, `just move-nic`, and
-cloning vxsuite into `~/code/vxsuite`.
+CA into the trust store, `/etc/profile.d/vmguard.sh`, the apt proxy config. That is
+`guest-setup.sh`, which lives on `work` outside this repo because it needs the CA,
+and that key does not belong here. The script detects whether it has run and
+adapts. Still by hand afterwards: `claude /login`, moving the guest's NIC onto the
+isolated network, and cloning vxsuite into `~/code/vxsuite`.
 
 ## VMGuard: the vxsuite VM's egress proxy (work only)
 

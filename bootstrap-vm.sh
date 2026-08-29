@@ -10,26 +10,19 @@
 #
 # What this does NOT do, on purpose: the vmguard guest side (MITM CA into the
 # trust store, /etc/profile.d/vmguard.sh, the apt proxy). That is `guest-setup.sh`
-# on `work`, run as `just guest-setup` from hosts/work/vmguard/Justfile, and it
-# needs the CA off the host -- which is not in this repo and must not be. This
-# script detects whether that has happened and adapts; see step 2.
+# on `work`, which needs the CA off the host -- not in this repo, and must not be.
+# This script detects whether that has happened and adapts; see step 2.
 #
-# WHERE THIS FITS in the vmguard provisioning order (Justfile header):
+# WHERE THIS FITS: everything this script fetches is allowlisted read-only in the
+# egress filter -- the four nixos.org hosts (NOTES 46, `egress_filter.py`),
+# deb.debian.org and security.debian.org for apt, and github.com for the clone.
+# On the NAT network it needs no policy at all.
 #
-#     just net-up → just install → just firewall-open → just guest-setup
-#         → *** this script, inside the guest ***  → just move-nic
-#
-# Anywhere after `guest-setup` works, on either side of `move-nic`. Everything
-# this script fetches is allowlisted read-only in the egress filter: the four
-# nixos.org hosts (NOTES 46, `egress_filter.py`), deb.debian.org and
-# security.debian.org for apt, and github.com for the clone. Running it before
-# `move-nic` on the NAT network works too, and needs no policy at all.
-#
-# The one hard ordering rule is `guest-setup` FIRST if the guest is already on
-# the isolated net: without the MITM CA in the trust store and the proxy env it
-# writes, nothing here can reach anything. Step 5 checks reachability before
-# running the nix installer, so both that case and a lapsed allowlist fail with
-# a reason rather than as a download timeout.
+# The one hard ordering rule: if the guest is already on the isolated net,
+# `guest-setup.sh` must have run FIRST. Without the MITM CA in the trust store
+# and the proxy env it writes, nothing here can reach anything. Step 5 checks
+# reachability before running the nix installer, so both that case and a lapsed
+# allowlist fail with a reason rather than as a download timeout.
 set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/eventualbuddha/nixos}"
@@ -129,7 +122,7 @@ if [ -r /etc/profile.d/vmguard.sh ]; then
   if [ ! -r /etc/apt/apt.conf.d/00-vmguard-proxy ]; then
     warn "/etc/apt/apt.conf.d/00-vmguard-proxy is missing -- sudo strips proxy env,"
     warn "so apt has no egress. Step 4 passes the proxy to apt explicitly to work"
-    warn "around it, but the real fix is running \`just guest-setup\` from work."
+    warn "around it, but the real fix is running \`guest-setup.sh\` from work."
   fi
 else
   say "no /etc/profile.d/vmguard.sh -- assuming direct internet (pre-move-nic, or not a vmguard guest)"
@@ -178,10 +171,10 @@ else
     elif ! curl -fsS -o /dev/null --max-time 20 "$host"; then
       die "cannot reach $host.
        The nixos.org hosts are allowlisted read-only in the egress filter (NOTES 46),
-       so on the isolated network this most likely means \`just guest-setup\` has not
+       so on the isolated network this most likely means \`guest-setup.sh\` has not
        run here yet -- no MITM CA, no proxy env, no egress at all. If it has, check
        that the deployed addon on work matches hosts/work/vmguard/egress_filter.py
-       (\`just denies\` will show the 403)."
+       (the deny-log query in README.md will show the 403)."
     fi
   done
 
@@ -348,6 +341,6 @@ say "   why passwordless sudo had to come first -- it runs 'sudo -n chsh')"
 printf '\n'
 say "Open a new login shell to land in it. Then, still to do by hand:"
 say "  1. claude /login          -- the guest holds its own subscription token"
-say "  2. just move-nic          -- on work, if this guest is still on the NAT net"
+say "  2. move this guest's NIC onto the vmguard network, on work, if it is still on NAT"
 say "  3. clone vxsuite into ~/code/vxsuite; \`wt\` and 10-vendor-tools.fish assume it"
 printf '\n'

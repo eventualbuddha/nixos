@@ -132,9 +132,10 @@
   # --- Git identity ----------------------------------------------------------
   #
   # This is the work machine, so commits made here carry the work address
-  # instead of the personal one home/dev.nix defaults to for judy. The signing
+  # instead of the personal one home/core/git.nix defaults to. The signing
   # key generated on this host is listed under both principals in
-  # home/dev.nix, so commits from either address still verify everywhere.
+  # home/core/signing-keys.nix, so commits from either address still verify
+  # everywhere.
   home-manager.users.brian.programs.git.settings.user.email = "brian@voting.works";
 
   # --- moshi-hook ------------------------------------------------------------

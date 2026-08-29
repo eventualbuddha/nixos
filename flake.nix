@@ -1,5 +1,5 @@
 {
-  description = "brian's NixOS config: niri + ghostty + noctalia, with GNOME kept as a fallback session";
+  description = "brian's NixOS config: niri + ghostty + noctalia";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";

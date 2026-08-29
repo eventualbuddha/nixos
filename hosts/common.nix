@@ -46,8 +46,8 @@
   # Enable the X11 windowing system.
   services.xserver.enable = true;
 
-  # Enable the GNOME Desktop Environment. Kept enabled as a fallback session
-  # alongside niri -- GDM will offer both at the login screen.
+  # GNOME, as a second session. niri (below) is the desktop this config is
+  # built around; GDM lists both at the login screen, so either can be picked.
   services.displayManager.gdm.enable = true;
   services.desktopManager.gnome.enable = true;
 
@@ -65,7 +65,7 @@
   services.gnome.gcr-ssh-agent.enable = false;
   programs.ssh.startAgent = true;
 
-  # niri, added alongside GNOME. This also wires up desktop portals/polkit
+  # niri, the primary session. This also wires up desktop portals/polkit
   # and registers a Wayland session entry that GDM will list.
   #
   # Using nixpkgs' own `niri` package (not niri-flake's niri-stable/cache build):
@@ -168,7 +168,7 @@
       # through work to this same name, which is why the alias is `vx` on every
       # machine rather than one name for local and another for remote.
       #
-      # ControlMaster/ControlPath: home/tunnels.nix's per-connection `ssh -W`
+      # ControlMaster/ControlPath: home/desktop/tunnels.nix's per-connection `ssh -W`
       # forwards would otherwise renegotiate a full handshake every time a
       # browser tab reconnects to localhost:3000 -- two of them where `vx` goes
       # through the jump host. Sharing one connection makes a reconnect a new
@@ -182,7 +182,7 @@
       # when it isn't (ssh falls back on its own if the ControlPath won't open).
       #
       # `auto` lets whoever arrives first own the socket, which put master
-      # setup and teardown inside the browser's request path; home/tunnels.nix
+      # setup and teardown inside the browser's request path; home/desktop/tunnels.nix
       # has the failure that came of it. It also had a sharp edge for
       # interactive use: interrupting an attempt that never authenticated --
       # Ctrl-C at an unexpected password prompt, a killed `ssh` -- could leave a

@@ -27,7 +27,6 @@ if ! nix eval --raw ".#nixosConfigurations.${HOST}.config.networking.hostName" >
 fi
 
 LOG="switch.log"
-echo "Switching to the niri/ghostty/noctalia generation (host: ${HOST})..." | tee "$LOG"
+echo "Switching to the new generation (host: ${HOST})..." | tee "$LOG"
 sudo nixos-rebuild switch --flake ".#${HOST}" 2>&1 | tee -a "$LOG"
 echo "Done. Active generation: $(readlink /nix/var/nix/profiles/system)" | tee -a "$LOG"
-echo "Log out and check the GDM session picker for 'niri' next to 'GNOME'."

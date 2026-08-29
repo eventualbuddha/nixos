@@ -6,7 +6,7 @@
 # reads flow, writes are pinned to specific orgs, a host-side GitHub PAT is
 # injected so the guest never holds a credential, and anything unrecognized is
 # denied and logged. ./vmguard/NOTES.md is the rationale for each rule and
-# ./vmguard/Justfile the day-to-day operations (deny-log triage, audit trail).
+# README.md the day-to-day operations (deny-log triage, audit trail).
 #
 # Ported from the Fedora install this machine replaces, where it was a
 # hand-rolled venv under /opt plus a unit dropped in /etc/systemd/system.
@@ -52,8 +52,8 @@ in
   };
 
   # Unit name kept as `vmguard-github` from the Fedora setup even though the
-  # addon outgrew GitHub long ago: ./vmguard/Justfile drives status/logs/restart
-  # and the deny-log recipes by that name, and so does NOTES.md.
+  # addon outgrew GitHub long ago: the README's operating commands and NOTES.md
+  # both name the unit, and renaming it would break every one of them.
   systemd.services.vmguard-github = {
     description = "VMGuard egress proxy (GitHub filter + Anthropic passthrough)";
     wantedBy = [ "multi-user.target" ];
