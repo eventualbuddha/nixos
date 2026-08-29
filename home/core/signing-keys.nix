@@ -33,6 +33,15 @@
       key = "sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIC6fscqgOvUDeta3U1/jTipzwfS0B3KrA7VYwbR9hGWgAAAABHNzaDo=";
     };
 
+    # The vxsuite build VM. Debian, not NixOS, and no YubiKey is passed through
+    # to the guest -- so unlike judy and work this is a plain ed25519 key rather
+    # than an sk- one, and the private half lives on disk in the guest at
+    # ~/.ssh/id_ed25519. Listed here so judy and work verify commits made in the
+    # VM; see hosts/vxdev/home.nix for the signing side.
+    vxdev = {
+      principals = [ "brian@voting.works" ];
+      key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINup0Nm8u0IKBab62buEN8H/D1BQXrmKEYnCZt7ouX5n";
+    };
   };
 
   # lib is passed in rather than captured so this stays a plain data file with
