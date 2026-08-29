@@ -83,6 +83,12 @@ in
     # thing it uniquely supplied -- not worth 739M and a second version manager.
     go
 
-    vite-plus
+    # node, npm, npx and corepack collide with nodejs_22 from
+    # home/toolchains.nix, which judy and work import alongside this file
+    # (vxdev takes home/core only, so nothing opposes the proxies there).
+    # vite-plus wins the collision: its proxies resolve the version a repo
+    # pins, which a fixed ambient 22 cannot. Same shape as the hiPrio on
+    # rust-analyzer above, and buildEnv fails the whole profile without it.
+    (lib.hiPrio vite-plus)
   ];
 }
