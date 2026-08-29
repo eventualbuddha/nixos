@@ -17,9 +17,6 @@ set -gx PATH "$PROTO_HOME/shims" "$PROTO_HOME/bin" $PATH
 # pnpm 10.34.5 that vxsuite pins.
 test -e "$HOME/.vite-plus/env.fish"; and source "$HOME/.vite-plus/env.fish"
 
-# moon
-test -e "$HOME/.moon/bin/env.fish"; and source "$HOME/.moon/bin/env.fish"
-
 # rustup (this VM's rustup is its own install, not the nixpkgs one that
 # home/toolchains.nix gives judy and work)
 test -e "$HOME/.cargo/env.fish"; and source "$HOME/.cargo/env.fish"
