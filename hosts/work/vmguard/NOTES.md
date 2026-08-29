@@ -1317,6 +1317,54 @@ needs doing, and how to back everything out.
       `systemctl show vmguard-github -p ExecStart --value` — the `egress_filter.py` store hash
       should be the one `nix eval` prints for the new build.
 
+47. **`unofficial-builds.nodejs.org` opened read-only — vite-plus's node runtimes
+    (2026-08-29, on request).** One host, whole-host rather than path-scoped. This is where
+    `vp env install <ver>` gets node from, and a single install walks three paths:
+    `/download/release/index.json` (the version list vp caches),
+    `/download/release/v<v>/SHASUMS256.txt`, and
+    `/download/release/v<v>/node-v<v>-linux-x64-musl.tar.{gz,xz}`. Pinning those would be a
+    version-shaped moving target for no gain — the host serves nothing but node builds — so
+    the entry is the plain read-only tier, GET/HEAD, no creds.
+
+    **Checked rather than assumed, twice over.**
+    - *That vp uses this host at all.* The etag cached in
+      `~/.local/share/vite-plus/js_runtime/node/index_cache.json` is `"6a8f6eb2-1b85b"`,
+      byte-exact with this host's `index.json` (112731 B, `1b85b` hex). `nodejs.org/dist/index.json`
+      is 329756 B with a completely different etag shape. So the fetch really is here and not
+      to the already-open `nodejs.org`.
+    - *That no second host hides behind it.* All three paths answer 200 directly from nginx
+      with no `Location`. Unlike `cdimage.debian.org` (item 45) or `astral.sh` (item 37),
+      there is no redirect chain to discover later.
+
+    **The integrity story is weaker than anything else in this tier, and that is the real
+    cost.** For the apt mirrors and the Debian ISOs the gate can be indifferent to the bytes
+    because a signature covers them. Not here: `SHASUMS256.txt` has **no detached signature**
+    — `/download/release/v26.7.0/SHASUMS256.txt.sig` and `.asc` are both 404, where
+    `nodejs.org/dist/v26.7.0/SHASUMS256.txt.sig` is a 200. The checksum file and the tarball
+    it describes come from the same host over the same TLS connection, so that connection is
+    the only thing vouching for either. These are "unofficial builds" in the literal sense.
+    Opened anyway, deliberately: musl node is what a Debian guest's vp needs, and this is the
+    only place it is published.
+
+    **Why the guest needs musl node at all**, since this is the second half of a story that
+    started on the host. vite-plus was in `home/core` and therefore on judy and work too,
+    where it broke the profile build outright — its argv[0] proxies (`node`, `npm`, `npx`,
+    `corepack`) collide with nodejs from `home/toolchains.nix`. Resolving that collision in
+    vp's favour turned out to be impossible on NixOS: every runtime it installs is a musl
+    build (`interpreter /lib/ld-musl-x86_64.so.1`), there is no musl loader on NixOS,
+    `programs.nix-ld` shims only the *glibc* loader, and supplying the musl loader by hand
+    just moves the error to a missing musl `libstdc++.so.6`. So vp is now vxdev-only
+    (`home/vite-plus.nix`) — Debian can run these binaries. This rule exists for that guest.
+
+    Nothing new needed for pnpm: vp pulls `@pnpm/exe` from `registry.npmjs.org`, open since
+    the initial import.
+
+    - Tests now 483 cases (+12): the three install shapes plus HEAD, an unseen path under the
+      same host (the point of a whole-host entry), POST/PUT denied, no credentials injected,
+      and exact-host denies pinning `unofficial-builds.org` and `builds.nodejs.org` while
+      `nodejs.org` itself stays allowed.
+    - **Deploy: `./apply.sh`** from the flake root, as item 46 records.
+
 ## Running it: `Justfile` (RETIRED)
 
 > **THE JUSTFILE IS GONE, DELETED IN THE NIXOS PORT (2026-08-28).** This section, and the two

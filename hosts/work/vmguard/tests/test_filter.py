@@ -857,6 +857,25 @@ check("nix/nixdev_denied",   gh("/manual/nix/stable/", "GET", host="nix.dev"), "
 check("nix/cachix_denied",   gh("/x.narinfo", "GET", host="nix-community.cachix.org"), "deny")
 check("nix/detsys_denied",   gh("/nix", "GET", host="install.determinate.systems"), "deny")
 
+# ---- vite-plus node runtimes (NOTES 47) ----
+# The three shapes a `vp env install` walks, plus HEAD.
+check("vp/index",            gh("/download/release/index.json", "GET", host="unofficial-builds.nodejs.org"), "allow")
+check("vp/shasums",          gh("/download/release/v26.7.0/SHASUMS256.txt", "GET", host="unofficial-builds.nodejs.org"), "allow")
+check("vp/tarball_xz",       gh("/download/release/v26.7.0/node-v26.7.0-linux-x64-musl.tar.xz", "GET", host="unofficial-builds.nodejs.org"), "allow")
+check("vp/tarball_gz",       gh("/download/release/v26.8.1/node-v26.8.1-linux-x64-musl.tar.gz", "GET", host="unofficial-builds.nodejs.org"), "allow")
+check("vp/head",             gh("/download/release/index.json", "HEAD", host="unofficial-builds.nodejs.org"), "allow")
+# The whole host is open to reads, so a path we have never seen is fine too...
+check("vp/unseen_path",      gh("/download/nightly/v27.0.0-nightly/SHASUMS256.txt", "GET", host="unofficial-builds.nodejs.org"), "allow")
+# ...but it is still read-only and credential-free, like every entry in the tier.
+check("vp/post_denied",      gh("/download/release/index.json", "POST", host="unofficial-builds.nodejs.org"), "deny")
+check("vp/put_denied",       gh("/download/release/x.tar.xz", "PUT", host="unofficial-builds.nodejs.org"), "deny")
+check("vp/no_creds",         hdrs("/download/release/index.json", "GET", "unofficial-builds.nodejs.org"), {})
+# Still an exact host: the parent domain and neighbouring names are not suffix-matched.
+# nodejs.org itself is separately open (pnpm's manage-Node), but these two are not.
+check("vp/bare_nodejs_org",  gh("/dist/index.json", "GET", host="nodejs.org"), "allow")
+check("vp/unofficial_bare",  gh("/download/release/index.json", "GET", host="unofficial-builds.org"), "deny")
+check("vp/nodejs_sub",       gh("/download/release/index.json", "GET", host="builds.nodejs.org"), "deny")
+
 try:
     os.remove(os.environ["VMGUARD_DENYLOG"])
 except OSError:

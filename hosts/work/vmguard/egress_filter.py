@@ -756,6 +756,40 @@ READ_ONLY_HOSTS = {"api.mason-registry.dev", "downloads.claude.ai", "herdr.dev",
                    # install.determinate.systems (a different installer than the one asked for).
                    "nixos.org", "releases.nixos.org",
                    "channels.nixos.org", "cache.nixos.org",
+
+                   # vite-plus's node runtimes (NOTES 47). vp is vxdev-only now
+                   # (home/vite-plus.nix) and this is where it fetches from. The whole
+                   # host, not a path list: a version install walks
+                   #
+                   #   /download/release/index.json                  the version list
+                   #   /download/release/v<v>/SHASUMS256.txt         checksums
+                   #   /download/release/v<v>/node-v<v>-linux-x64-musl.tar.{gz,xz}
+                   #
+                   # and pinning those would be a version-shaped moving target for no
+                   # gain -- the host serves nothing but node builds. All plain GETs,
+                   # answered directly by nginx with no redirect, so unlike cdimage
+                   # (NOTES 45) or astral.sh (NOTES 37) there is no second host behind
+                   # it.
+                   #
+                   # That vp really goes here rather than to nodejs.org was checked, not
+                   # assumed: the etag cached in
+                   # ~/.local/share/vite-plus/js_runtime/node/index_cache.json is
+                   # "6a8f6eb2-1b85b", byte-exact with this host's index.json (112731 B)
+                   # and nothing like nodejs.org/dist/index.json's.
+                   #
+                   # INTEGRITY IS WEAKER HERE than for the apt mirrors or the Debian
+                   # ISOs, and that is the real cost of this entry. SHASUMS256.txt
+                   # carries no detached signature -- .sig and .asc are both 404, where
+                   # nodejs.org/dist publishes a .sig -- so the checksums and the
+                   # tarball come from the same host over the same TLS connection, and
+                   # nothing vouches for either beyond that connection. These are
+                   # "unofficial builds" in the literal sense. Opened anyway because
+                   # musl node is what a Debian-guest vp needs and this is the only
+                   # place it is published.
+                   #
+                   # pnpm needs nothing new: vp pulls @pnpm/exe from registry.npmjs.org,
+                   # already open above.
+                   "unofficial-builds.nodejs.org",
                    }
 
 # Exact POST paths permitted on a READ_ONLY_HOSTS host, as {host: {paths}}. Everything else on
