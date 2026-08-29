@@ -16,21 +16,12 @@
     };
   };
 
+  # GUI-only. The terminal tools that used to live here (eza, bat, ripgrep,
+  # gh, jq, yazi, btop, ...) moved to home/core/cli.nix so a headless machine
+  # gets them too -- `ls`/`cat` in home/core/shell.nix are aliased to eza/bat
+  # and were broken without them.
   home.packages = with pkgs; [
     vesktop
     pear-desktop # formerly `youtube-music`
-    yazi
-    btop
-    fastfetch
-    eza
-
-    # CLI quality-of-life
-    gh # GitHub CLI
-    ripgrep # rg
-    dust # nicer `du` (you asked for "df-dust" -- the package/binary is `dust`)
-    duf # nicer `df`, pairs with dust
-    bat # nicer `cat`, syntax highlighting
-    procs # nicer `ps`
-    jq # JSON processor
   ];
 }
