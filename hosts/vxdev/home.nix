@@ -35,6 +35,15 @@
 
   programs.home-manager.enable = true;
 
+  # Purple prompt on the VM. home/core/shell.nix sets the stock tokyo-night
+  # preset for every machine; this overrides just the colors with VotingWorks
+  # purple, so the vxsuite VM's terminals are distinguishable from judy's and
+  # work's at a glance. See the header of the toml for where the colors come
+  # from.
+  programs.starship.settings = fromTOML (
+    builtins.readFile ../../home/core/starship-tokyo-night-vx.toml
+  );
+
   # Let home-manager own bash too, so this VM's shell environment comes from the
   # flake whichever shell is in use. fish has been fully declared for a while;
   # bash was the last hand-written surface, and it was carrying four lines that

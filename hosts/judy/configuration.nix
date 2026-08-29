@@ -102,5 +102,16 @@
     })
   ];
 
+  # --- Prompt ----------------------------------------------------------------
+  #
+  # judy keeps the gruvbox-rainbow preset it has always had; home/core/shell.nix
+  # sets tokyo-night as the default, which work takes as-is and the vxsuite VM
+  # overrides with a purple recolor. Three machines, three prompts, so a
+  # terminal is identifiable at a glance -- which is the whole point, given
+  # judy reaches the other two over ssh.
+  home-manager.users.brian.programs.starship.settings = fromTOML (
+    builtins.readFile ../../home/core/starship-gruvbox-rainbow.toml
+  );
+
   virtualisation.containers.enable = true;
 }

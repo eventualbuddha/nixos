@@ -1,0 +1,115 @@
+# The upstream "tokyo-night" preset with one change: its blue ramp swapped for
+# VotingWorks purple, so the vxsuite VM's prompt is visibly not judy or work.
+#
+# Colors come from vxsuite itself, so this tracks the product's own palette:
+#   #6638b6  the logo circle in libs/ui/src/left_nav.tsx -- the brand purple
+#   #b591f3  Purple50 in libs/ui/src/themes/make_theme.ts
+# The three dark segment backgrounds are the preset's own, re-hued to 262 --
+# the hue the whole purple ramp in make_theme.ts is built on.
+#
+# Nothing but colors differs from starship-tokyo-night.toml, so a diff of the
+# two files is exactly the theme, and re-fetching the preset stays cheap:
+#   diff <(grep -o "#[0-9a-f]\{6\}" starship-tokyo-night.toml | sort -u) \
+#        <(grep -o "#[0-9a-f]\{6\}" starship-tokyo-night-vx.toml | sort -u)
+
+"$schema" = 'https://starship.rs/config-schema.json'
+
+format = """
+[░▒▓](#b591f3)\
+$os\
+[](bg:#6638b6 fg:#b591f3)\
+$directory\
+[](fg:#6638b6 bg:#362c4b)\
+$git_branch\
+$git_status\
+[](fg:#362c4b bg:#241e33)\
+$nodejs\
+$bun\
+$rust\
+$golang\
+$php\
+[](fg:#241e33 bg:#1f1a2b)\
+$time\
+[ ](fg:#1f1a2b)\
+\n$character"""
+
+[directory]
+style = "fg:#e3e5e5 bg:#6638b6"
+format = "[ $path ]($style)"
+truncation_length = 3
+truncation_symbol = "…/"
+
+[directory.substitutions]
+"Documents" = "󰈙 "
+"Downloads" = " "
+"Music" = " "
+"Pictures" = " "
+
+[git_branch]
+symbol = ""
+style = "bg:#362c4b"
+format = '[[ $symbol $branch ](fg:#6638b6 bg:#362c4b)]($style)'
+
+[git_status]
+style = "bg:#362c4b"
+format = '[[($all_status$ahead_behind )](fg:#6638b6 bg:#362c4b)]($style)'
+
+[nodejs]
+symbol = ""
+style = "bg:#241e33"
+format = '[[ $symbol ($version) ](fg:#b591f3 bg:#241e33)]($style)'
+
+[bun]
+symbol = ""
+style = "bg:#241e33"
+format = '[[ $symbol ($version) ](fg:#b591f3 bg:#241e33)]($style)'
+
+[rust]
+symbol = ""
+style = "bg:#241e33"
+format = '[[ $symbol ($version) ](fg:#b591f3 bg:#241e33)]($style)'
+
+[golang]
+symbol = ""
+style = "bg:#241e33"
+format = '[[ $symbol ($version) ](fg:#b591f3 bg:#241e33)]($style)'
+
+[php]
+symbol = ""
+style = "bg:#241e33"
+format = '[[ $symbol ($version) ](fg:#b591f3 bg:#241e33)]($style)'
+
+[time]
+disabled = false
+time_format = "%R" # Hour:Minute Format
+style = "bg:#1f1a2b"
+format = '[[  $time ](fg:#ada0cb bg:#1f1a2b)]($style)'
+
+[os]
+style = "bg:#b591f3 fg:#090c0c"
+format = "[ $symbol ]($style)"
+disabled = false
+
+[os.symbols]
+Windows = "󰍲"
+Ubuntu = "󰕈"
+SUSE = ""
+Raspbian = "󰐿"
+Mint = "󰣭"
+Macos = "󰀵"
+Manjaro = ""
+Linux = "󰌽"
+Gentoo = "󰣨"
+Fedora = "󰣛"
+Alpine = ""
+Amazon = ""
+Android = ""
+AOSC = ""
+Arch = "󰣇"
+Artix = "󰣇"
+EndeavourOS = ""
+CentOS = ""
+Debian = "󰣚"
+Redhat = "󱄛"
+RedHatEnterprise = "󱄛"
+Pop = ""

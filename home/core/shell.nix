@@ -1,4 +1,4 @@
-{ ... }:
+{ lib, ... }:
 
 {
   # EDITOR was set in home/default.nix and again in hosts/vxdev/home.nix; VISUAL
@@ -36,11 +36,18 @@
 
   programs.zoxide.enable = true;
 
-  # Starship prompt, using the upstream "gruvbox-rainbow" preset verbatim
-  # (fetched from starship/starship's own presets, not hand-rolled).
+  # Starship prompt, using the upstream "tokyo-night" preset verbatim (fetched
+  # from starship/starship's own presets, not hand-rolled).
+  #
+  # mkDefault so a host can swap the theme without unsetting anything. Three
+  # machines, three prompts, so a terminal is identifiable at a glance:
+  #
+  #   work   this default, stock tokyo-night
+  #   judy   gruvbox-rainbow          (hosts/judy/configuration.nix)
+  #   vxdev  tokyo-night in VotingWorks purple  (hosts/vxdev/home.nix)
   programs.starship = {
     enable = true;
     enableFishIntegration = true;
-    settings = fromTOML (builtins.readFile ./starship-gruvbox-rainbow.toml);
+    settings = lib.mkDefault (fromTOML (builtins.readFile ./starship-tokyo-night.toml));
   };
 }
