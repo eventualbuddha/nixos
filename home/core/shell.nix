@@ -1,6 +1,14 @@
-_:
+{ ... }:
 
 {
+  # EDITOR was set in home/default.nix and again in hosts/vxdev/home.nix; VISUAL
+  # only existed in a hand-written conf.d file on the VM. Both belong next to
+  # the rest of the shell config, set once for every machine.
+  home.sessionVariables = {
+    EDITOR = "nvim";
+    VISUAL = "nvim";
+  };
+
   programs.fish = {
     enable = true;
     interactiveShellInit = ''
@@ -11,6 +19,14 @@ _:
       fish_vi_key_bindings insert
     '';
     shellAliases = {
+      # Walk up. fish has no built-in for these and they are pure muscle
+      # memory, so they belong with the shared config rather than in a
+      # per-machine file.
+      ".." = "cd ..";
+      "..." = "cd ../..";
+      "...." = "cd ../../..";
+      "....." = "cd ../../../..";
+
       ls = "eza -l --icons --group-directories-first";
       ll = "eza -l --icons --group-directories-first";
       lt = "eza --tree --icons --group-directories-first";
