@@ -679,22 +679,17 @@ READ_ONLY_HOSTS = {"api.mason-registry.dev", "downloads.claude.ai", "herdr.dev",
                    # (NOTES 36). Predicted in NOTES 35 and now evidence, per the item 31 rule.
                    "docs.gitbutler.com", "blog.gitbutler.com",
 
-                   # Google Antigravity: install script, the CLI's update manifest, the tarball
-                   # host it downloads from, the Unleash feature-flag service, and Google's OAuth
-                   # endpoint. Three of these are plain GETs; the flag client and the token
-                   # endpoint also need one POST each, so they carry entries in
-                   # READ_ONLY_POST_PATHS below — everything else on them stays GET/HEAD-only.
-                   "antigravity.google", "antigravity-cli-auto-updater-974169037036.us-central1.run.app",
-                   "antigravity-unleash.goog",
-                   "oauth2.googleapis.com",
+                   # Claude Code's release bucket. `claude install` and the native build's own
+                   # self-update fetch their tarballs from here, which is what makes the
+                   # bootstrap in the flake's home/core/claude-code.nix work — claude.ai itself
+                   # is deliberately NOT listed, so the documented `curl claude.ai/install.sh`
+                   # one-liner 403s here and the subcommand is used instead.
+                   #
+                   # This whole block was originally Google Antigravity's (install script, update
+                   # manifest, Unleash flags, OAuth, userinfo, avatar CDN). Antigravity was
+                   # removed on 2026-08-29 and those hosts went with it; storage.googleapis.com
+                   # is the one entry that turned out to be load-bearing for something else.
                    "storage.googleapis.com",
-                   # Post-sign-in session bootstrap (NOTES 33): one GET, /oauth2/v2/userinfo
-                   # ("who am I"). Antigravity's Code Assist backend is not in this tier at all —
-                   # see the cloudcode-pa entries in OPEN_HOSTS.
-                   "www.googleapis.com",
-                   # the signed-in user's Google profile picture, shown in Antigravity's UI
-                   # (NOTES 34). Cosmetic, and a GET of an opaque avatar id.
-                   "lh3.googleusercontent.com",
 
                    # GitButler CLI (`but`) install, requested ahead of first use (NOTES 35). The
                    # whole `curl -fsSL https://gitbutler.com/install.sh | sh` chain is five GETs
@@ -774,25 +769,17 @@ READ_ONLY_HOSTS = {"api.mason-registry.dev", "downloads.claude.ai", "herdr.dev",
 # bounded, write-out channel, and a wider one than anything else in this tier. Opened
 # deliberately on request (NOTES 31); revoke by deleting the entry, which restores GET/HEAD-only.
 #
-# The last two are Antigravity's (NOTES 32), and are the only part of that host block that is not
-# GET/HEAD. `oauth2.googleapis.com POST /token` is the OAuth code/refresh exchange — sign-in
-# cannot complete without it, and its body is the standard small form-encoded grant. Unleash's
-# `/api/client/register` is the flag SDK's one-time handshake (app name, SDK version, the flag
-# names it knows about) before it starts GETting /api/client/features. Both bodies are small and
-# structured, but like every entry here they are NOT inspected.
+# Two Antigravity entries lived here (an OAuth token exchange and an Unleash flag handshake)
+# until Antigravity was removed on 2026-08-29; they went with it, along with the two
+# cloudcode-pa OPEN_HOSTS entries that were its model backend.
 #
-# Deliberately NOT here, though the log shows them 403ing: `antigravity-unleash.goog POST
-# /api/client/metrics` and `play.googleapis.com POST /log`. Both are pure telemetry — nothing
-# stops working without them — and they are exactly the shape (periodic POST, guest-authored
-# body) this gate exists to keep shut, same call as cafe.github.com's telemetry in NOTES 30.
-#
-# Antigravity's Code Assist backend is NOT here — path-listing it was whack-a-mole, so the two
-# cloudcode-pa hosts are in OPEN_HOSTS instead (NOTES 33).
+# The rule those left behind is worth keeping: telemetry POSTs stay shut even when the log shows
+# them 403ing. `play.googleapis.com POST /log` was refused on exactly that basis — nothing stops
+# working without it, and a periodic POST with a guest-authored body is the shape this gate
+# exists to keep closed, same call as cafe.github.com's telemetry in NOTES 30.
 READ_ONLY_POST_PATHS = {
     "registry.npmjs.org":       {"/-/npm/v1/security/advisories/bulk"},  # npm audit
     "api.osv.dev":              {"/v1/querybatch"},                      # osv-scanner batch query
-    "oauth2.googleapis.com":    {"/token"},                              # Antigravity sign-in
-    "antigravity-unleash.goog": {"/api/client/register"},                # Unleash flag handshake
 }
 
 # FULLY-OPEN HOSTS — the one exception to the whole model. Every other rule in this file is
@@ -816,16 +803,6 @@ READ_ONLY_POST_PATHS = {
 # `100.54.242.68` lived here from 2026-08-04 (NOTES 28) until 2026-08-11, when it was removed on
 # request — no longer needed. It is denied again like any unlisted host.
 OPEN_HOSTS = {
-              # Antigravity's Code Assist backend — prod channel and its 'daily' channel, both
-              # seen in the log. Opened on request (NOTES 33) after path-listing the bootstrap
-              # RPCs proved to be whack-a-mole. Be clear-eyed about what this one is: it is the
-              # agent's MODEL backend, so its request bodies are prompts — i.e. whatever the
-              # guest has read — and this file cannot tell a prompt from an exfil payload. It is
-              # the same bargain already struck for api.anthropic.com, which the systemd unit
-              # tunnels with --ignore-hosts and never even bumps; the difference is that this one
-              # is at least logged. Narrow to :generateContent & co. if that ever seems worth it.
-              "cloudcode-pa.googleapis.com", "daily-cloudcode-pa.googleapis.com",
-
               # moshi-hook's daemon backend (NOTES 42), opened on request. This one is here for a
               # reason worth reading before adding anything like it: `moshi serve` reaches it as
               # `GET wss://…/api/v1/hosts/<hostId>/connect` — a WebSocket. The upgrade is a GET, so

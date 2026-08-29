@@ -443,7 +443,7 @@ check("ro/meat_subdomain",    gh("/install.sh", "GET", host="cdn.meat.dev"), "de
 check("ro/golang_org_bare",   gh("/dl/", "GET", host="golang.org"), "deny")
 
 # ---- fully-open host: every method through, but still no credential and still logged ----
-OPEN = "cloudcode-pa.googleapis.com"
+OPEN = "api.getmoshi.app"
 check("open/get",    gh("/",             "GET",    host=OPEN), "allow")
 check("open/post",   gh("/collect",      "POST",   host=OPEN), "allow")
 check("open/put",    gh("/x",            "PUT",    host=OPEN), "allow")
@@ -451,7 +451,7 @@ check("open/delete", gh("/x",            "DELETE", host=OPEN), "allow")
 check("open/patch",  gh("/x",            "PATCH",  host=OPEN), "allow")
 check("open/deep_path_qs", gh("/a/b/c?d=1", "POST", host=OPEN), "allow")
 # the host entry is exact — a neighbour is NOT covered
-check("open/neighbour_denied", gh("/", "POST", host="other-cloudcode-pa.googleapis.com"), "deny")
+check("open/neighbour_denied", gh("/", "POST", host="other-api.getmoshi.app"), "deny")
 # 100.54.242.68 was fully open from 2026-08-04 until it was removed on request (NOTES 33)
 check("open/retired_ip",       gh("/", "POST", host="100.54.242.68"), "deny")
 check("open/retired_ip_get",   gh("/", "GET",  host="100.54.242.68"), "deny")
@@ -591,7 +591,7 @@ check("ci/tasks_s3_denied",  gh("/storage/artifacts/x/y/0/z.png", "GET", host="c
 check("ci/no_pat_on_circle", "authorization" in circle_hdrs(RERUN), False)
 check("ci/token_not_on_github", "circle-token" in hdrs("/votingworks/vxsuite", "GET", "github.com"), False)
 check("ci/token_not_on_api",    "circle-token" in hdrs("/repos/votingworks/vxsuite/pulls/1", "GET", "api.github.com"), False)
-check("ci/token_not_on_open",   "circle-token" in hdrs("/x", "POST", "cloudcode-pa.googleapis.com"), False)
+check("ci/token_not_on_open",   "circle-token" in hdrs("/x", "POST", "api.getmoshi.app"), False)
 
 # ---- the three read-only hosts added 2026-08-05 ----
 check("ro/circle_artifact",    gh("/output/job/abc/artifacts/0/moon-task-logs/test/stderr.log", "GET", host="output.circle-artifacts.com"), "allow")
@@ -657,53 +657,25 @@ check("rop/cross_host2",     gh("/-/npm/v1/security/advisories/bulk", "POST", ho
 # and it injects no credential, like every other read-only host
 check("rop/npm_no_creds",    hdrs("/-/npm/v1/security/advisories/bulk", "POST", "registry.npmjs.org"), {})
 
-# ---- Google Antigravity (NOTES 32): reads on five hosts, two exact POST paths ----
-check("ag/install_sh",       gh("/cli/install.sh", "GET", host="antigravity.google"), "allow")
-check("ag/update_manifest",  gh("/manifests/linux_amd64.json", "GET", host="antigravity-cli-auto-updater-974169037036.us-central1.run.app"), "allow")
-check("ag/cli_tarball",      gh("/antigravity-public/antigravity-cli/1.1.12-5877618327814144/linux-x64/cli_linux_x64.tar.gz", "GET", host="storage.googleapis.com"), "allow")
-check("ag/unleash_features", gh("/api/client/features", "GET", host="antigravity-unleash.goog"), "allow")
-# the two POSTs that sign-in and the flag client actually need
-check("ag/oauth_token",      gh("/token", "POST", host="oauth2.googleapis.com"), "allow")
-check("ag/unleash_register", gh("/api/client/register", "POST", host="antigravity-unleash.goog"), "allow")
-# telemetry stays denied: unleash metrics, and clearcut on a host that was never added at all
-check("ag/unleash_metrics",  gh("/api/client/metrics", "POST", host="antigravity-unleash.goog"), "deny")
-check("ag/play_log",         gh("/log", "POST", host="play.googleapis.com"), "deny")
-# exact paths and POST only — nothing else on the two opened hosts rides along
-check("ag/oauth_revoke",     gh("/revoke", "POST", host="oauth2.googleapis.com"), "deny")
-check("ag/oauth_token_put",  gh("/token", "PUT", host="oauth2.googleapis.com"), "deny")
-check("ag/unleash_prefix",   gh("/api/client/register/x", "POST", host="antigravity-unleash.goog"), "deny")
-check("ag/storage_put",      gh("/antigravity-public/x", "PUT", host="storage.googleapis.com"), "deny")
-# exact hosts: neighbouring Google hosts are not covered by these entries
-check("ag/other_google",     gh("/x", "GET", host="clients2.google.com"), "deny")
-check("ag/antigravity_sub",  gh("/x", "GET", host="cdn.antigravity.google"), "deny")
-# no credential is injected here either
-check("ag/oauth_no_creds",   hdrs("/token", "POST", "oauth2.googleapis.com"), {})
-
-# ---- Antigravity session bootstrap (NOTES 33) ----
-check("ag/userinfo",         gh("/oauth2/v2/userinfo", "GET", host="www.googleapis.com"), "allow")
-check("ag/userinfo_post",    gh("/oauth2/v2/userinfo", "POST", host="www.googleapis.com"), "deny")
-# the code-assist backend is in OPEN_HOSTS: every method and path, on both channels
-for _h in ("cloudcode-pa.googleapis.com", "daily-cloudcode-pa.googleapis.com"):
-    _tag = "daily" if _h.startswith("daily") else "prod"
-    check(f"ag/{_tag}_load",     gh("/v1internal:loadCodeAssist", "POST", host=_h), "allow")
-    check(f"ag/{_tag}_settings", gh("/v1internal:setUserSettings", "POST", host=_h), "allow")
-    check(f"ag/{_tag}_exp",      gh("/v1internal:listExperiments", "POST", host=_h), "allow")
-    # model traffic, and anything else the client reaches for later, no longer 403s
-    check(f"ag/{_tag}_generate", gh("/v1internal:generateContent", "POST", host=_h), "allow")
-    check(f"ag/{_tag}_stream",   gh("/v1internal:streamGenerateContent?alt=sse", "POST", host=_h), "allow")
-    check(f"ag/{_tag}_unknown",  gh("/v2whatever:somethingNew", "PUT", host=_h), "allow")
-    check(f"ag/{_tag}_get",      gh("/v1internal:loadCodeAssist", "GET", host=_h), "allow")
-    # open does NOT mean credentialed: the PAT still never leaves GitHub
-    check(f"ag/{_tag}_no_creds", hdrs("/v1internal:loadCodeAssist", "POST", _h), {})
-# still exact hosts — a third code-assist channel is not covered by the two entries
-check("ag/cloudcode_other",  gh("/v1internal:loadCodeAssist", "POST", host="staging-cloudcode-pa.googleapis.com"), "deny")
-# and opening these two did not open googleapis.com generally
-check("ag/play_still_denied",gh("/log", "POST", host="play.googleapis.com"), "deny")
-# the signed-in user's avatar (NOTES 34) — a GET, like the rest of the tier
-check("ag/avatar",           gh("/a/ACg8ocILUZHsgW_ROYMoinX9aQzUfFQEN7kMQB1nM7JltaH80DF2bg8=s96-c", "GET", host="lh3.googleusercontent.com"), "allow")
-check("ag/avatar_post",      gh("/upload", "POST", host="lh3.googleusercontent.com"), "deny")
-# exact host: sibling googleusercontent CDNs are not covered by the lh3 entry
-check("ag/avatar_sibling",   gh("/x", "GET", host="lh4.googleusercontent.com"), "deny")
+# ---- Claude Code's release bucket, the one host left from the retired Antigravity block ----
+# Antigravity was removed on 2026-08-29; its hosts (antigravity.google, the auto-updater,
+# antigravity-unleash.goog, oauth2/www.googleapis.com, lh3.googleusercontent.com) and the two
+# cloudcode-pa OPEN_HOSTS entries went with it, along with the tests that asserted them.
+# storage.googleapis.com stayed, because `claude install` and the native build's self-update
+# fetch their tarballs from it.
+check("cc/tarball",          gh("/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/stable", "GET", host="storage.googleapis.com"), "allow")
+# read-only like the rest of the tier: no writes to the bucket
+check("cc/storage_put",      gh("/claude-code-dist/x", "PUT", host="storage.googleapis.com"), "deny")
+check("cc/storage_post",     gh("/claude-code-dist/x", "POST", host="storage.googleapis.com"), "deny")
+# and it injects no credential
+check("cc/storage_no_creds", hdrs("/claude-code-dist/x", "GET", "storage.googleapis.com"), {})
+# listing storage.googleapis.com did not open googleapis.com or Google generally
+check("cc/other_googleapis", gh("/x", "GET", host="clients2.google.com"), "deny")
+check("cc/play_log_denied",  gh("/log", "POST", host="play.googleapis.com"), "deny")
+# the retired Antigravity hosts are denied again like any unlisted host
+check("cc/antigravity_gone", gh("/cli/install.sh", "GET", host="antigravity.google"), "deny")
+check("cc/cloudcode_gone",   gh("/v1internal:loadCodeAssist", "POST", host="cloudcode-pa.googleapis.com"), "deny")
+check("cc/oauth_gone",       gh("/token", "POST", host="oauth2.googleapis.com"), "deny")
 
 # ---- GitButler CLI install (NOTES 35): the five GETs of the install chain, in order ----
 check("gb/install_sh",       gh("/install.sh", "GET", host="gitbutler.com"), "allow")
