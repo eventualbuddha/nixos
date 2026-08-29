@@ -1,29 +1,40 @@
 # vite-plus (`vp`), imported by vxdev only.
 #
-# It lived in home/core until it turned out to be unusable on NixOS. vp's whole
-# job is managing node/pnpm toolchains per project, and every runtime it
-# installs is a musl build (`interpreter /lib/ld-musl-x86_64.so.1`). NixOS has
-# no musl loader; programs.nix-ld does not cover it, because nix-ld shims the
-# *glibc* loader at /lib64/ld-linux-x86-64.so.2. Supplying the musl loader by
-# hand is not enough either -- the binary then wants musl builds of
-# libstdc++.so.6 and libgcc_s.so.1 -- and `vp env off` (system-first) does not
-# rescue it, since a configured default version still resolves to the managed
-# runtime. So on judy and work `node` via vp could not execute at any version,
-# while its four argv[0] proxies (node/npm/npx/corepack) collided with nodejs_26
-# from home/toolchains.nix and broke the profile build outright.
+# It lived in home/core until it turned out to be unusable on NixOS: the
+# node/pnpm runtimes vp installs could not exec, because they were musl builds
+# (`interpreter /lib/ld-musl-x86_64.so.1`) and NixOS has no musl loader --
+# programs.nix-ld does not cover it, since nix-ld shims the *glibc* loader at
+# /lib64/ld-linux-x86-64.so.2. On top of that, vp's four argv[0] proxies
+# (node/npm/npx/corepack) collided with nodejs_26 from home/toolchains.nix and
+# broke the profile build outright, so it is vxdev-only.
 #
-# On vxdev none of that applies: it is Debian, it can run the musl runtimes, and
-# per-directory resolution of the node/pnpm versions a vxsuite checkout pins is
-# exactly what the VM needs. Judy and work get an ambient nix node instead and
-# per-project toolchains from a devShell + direnv.
-{ pkgs, ... }:
+# The musl half of that story turned out to be self-inflicted, and it bit vxdev
+# too: vp picks the libc of the node tarball it downloads from *its own* build
+# target, not from the host. Installing the `-musl` vp release below therefore
+# made vp fetch musl node builds -- invisible for a while, because node only
+# publishes musl tarballs for v26+, so every 20/22/24 runtime here is glibc and
+# only the v26 ones broke. On Debian that surfaced as
+#
+#   error: Failed to exec .../js_runtime/node/26.8.1/bin/node:
+#   No such file or directory (os error 2)
+#
+# i.e. the ELF interpreter is missing, not the binary. Hence the `-gnu` release
+# below. Any runtime installed while the musl vp was in the profile is still
+# musl and still cannot run: `vp env uninstall <version>` and reinstall it.
+{
+  pkgs,
+  ...
+}:
 
 let
-  # vite-plus (https://viteplus.dev) is not in nixpkgs. Upstream ships a musl
-  # build whose only content is a single static-pie `vp` -- `file` reports
-  # "static-pie linked" and there is no .interp section -- so this needs no
-  # autoPatchelfHook, just fetch and install, the same shape as `herdr` in
-  # ./cli.nix.
+  # vite-plus (https://viteplus.dev) is not in nixpkgs, so fetch the release
+  # tarball, whose only content is a single `vp`. The musl build is the
+  # tempting one -- static-pie, no .interp section, no autoPatchelfHook needed,
+  # the same shape as `herdr` in ./cli.nix -- but see the header: vp derives
+  # the libc of the node tarballs it downloads from its own target triple, so
+  # the musl vp hands this Debian box node builds it cannot exec. The gnu build
+  # is dynamically linked against glibc/libgcc and needs the usual patchelf
+  # pass.
   #
   # Nix owns the vp binary; vp keeps owning what it installs. The node and pnpm
   # toolchains it resolves per-directory still live in ~/.vite-plus and are
@@ -42,10 +53,16 @@ let
       pname = "vite-plus";
       inherit version;
       src = pkgs.fetchurl {
-        url = "https://github.com/voidzero-dev/vite-plus/releases/download/v${version}/vp-x86_64-unknown-linux-musl.tar.gz";
-        hash = "sha256-VI8pqJrYSsFFhoN309aJAnerAKe4Tv8z+j0hzHw3T5E=";
+        url = "https://github.com/voidzero-dev/vite-plus/releases/download/v${version}/vp-x86_64-unknown-linux-gnu.tar.gz";
+        hash = "sha256-aOAquir4d8OPGepADnMB0IPqGOrYdx3IB1eBLCSsxNA=";
       };
       sourceRoot = ".";
+
+      nativeBuildInputs = [ pkgs.autoPatchelfHook ];
+      buildInputs = [
+        pkgs.stdenv.cc.cc.lib # libgcc_s.so.1
+        pkgs.glibc # libc/libm/libdl/librt/libpthread
+      ];
 
       # vp dispatches on argv[0], so every tool it fronts is just another name
       # for the same binary -- exactly how nixpkgs' rustup ships cargo/rustc as
