@@ -10,6 +10,7 @@ _:
     ./niri.nix
     ./noctalia.nix
     ./terminal.nix
+    ./editors.nix
     ./apps.nix
     ./theme.nix
     ./tunnels.nix
