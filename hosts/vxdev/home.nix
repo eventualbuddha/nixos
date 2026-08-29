@@ -26,39 +26,37 @@ _:
     username = "vx";
     homeDirectory = "/home/vx";
     stateVersion = "25.05";
-    sessionVariables.EDITOR = "nvim";
   };
 
   programs.home-manager.enable = true;
 
-  # Standalone home-manager installs into ~/.nix-profile, and nothing on this
-  # Debian box puts that directory on PATH early enough: /etc/fish/conf.d/nix.fish
-  # adds only the daemon's default profile, not the per-user one.
+  # This VM's fish configuration, all of it. What used to be a pile of
+  # hand-copied files in ~/.config/fish/conf.d is now declared here, so a
+  # rebuilt guest gets the same shell without anyone remembering what was in
+  # that directory. The shared half -- aliases, prompt, vi bindings, zoxide --
+  # comes from home/core/shell.nix; these are the parts that are specific to
+  # this machine.
   #
-  # This has to be a conf.d file rather than programs.fish.shellInit. fish
-  # sources conf.d/*.fish in name order and only then config.fish, which is what
-  # home-manager generates -- so anything set from shellInit lands after every
-  # hand-written conf.d file has already run. Several of those call the tools in
-  # question: zz-prompt.fish runs `starship init`, and uv.fish guards its
-  # completions on `type -q uv`. With the PATH fix in config.fish, the first
-  # failed loudly and the second silently stopped loading, because at conf.d
-  # time neither binary was on PATH yet.
+  # Kept as real .fish files under hosts/vxdev/fish/ rather than inline Nix
+  # strings: fish is full of `$` and these scripts are long enough that
+  # escaping them into '' '' blocks would cost more than the indirection, and
+  # this way they stay syntax-highlighted and directly editable.
   #
-  # The 00- prefix sorts it ahead of every other file in the directory, so the
-  # nix profile is on PATH before anything can look for a tool in it.
-  #
-  # `-m` moves the entry to the front if some other file already added it;
-  # vite-plus, proto, moon, rustup and local-bin all fish_add_path themselves
-  # there.
-  #
-  # Not in home/core because it is wrong on NixOS, where useUserPackages puts
-  # packages in /etc/profiles/per-user/$USER/bin and ~/.nix-profile does not
-  # exist.
-  xdg.configFile."fish/conf.d/00-nix-profile-path.fish".text = ''
-    # Managed by home-manager (hosts/vxdev/home.nix). See the comment there for
-    # why this is a conf.d file and not programs.fish.shellInit.
-    fish_add_path -gm $HOME/.nix-profile/bin
-  '';
+  # The numeric prefixes are load order, which matters -- see the comments in
+  # each file.
+  xdg.configFile = {
+    "fish/conf.d/00-nix-profile-path.fish".source = ./fish/00-nix-profile-path.fish;
+    "fish/conf.d/10-vendor-tools.fish".source = ./fish/10-vendor-tools.fish;
+    "fish/conf.d/20-vmguard.fish".source = ./fish/20-vmguard.fish;
+
+    # `wt` manages the vxsuite worktrees under ~/code (see `wt help`). Only
+    # here, not in home/core: it hardcodes ~/code/vxsuite and is meaningless on
+    # a machine without that checkout. The completions call back into the
+    # function itself (`wt __targets` / `wt __branches`) so the two stay in
+    # sync, which is why they have to travel together.
+    "fish/functions/wt.fish".source = ./fish/wt.fish;
+    "fish/completions/wt.fish".source = ./fish/wt-completions.fish;
+  };
 
   # Everything that was in ~/.gitconfig, which guest-setup.sh and hand-editing
   # built up over the life of this VM. home-manager writes ~/.config/git/config,
