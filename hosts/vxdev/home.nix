@@ -17,7 +17,12 @@
 #
 # Apply with:
 #   nix run home-manager/master -- switch --flake ~/nixos#vx@vxdev
-{ config, ... }:
+{
+  pkgs,
+  lib,
+  config,
+  ...
+}:
 
 {
   imports = [
@@ -34,6 +39,44 @@
   };
 
   programs.home-manager.enable = true;
+
+  # Make the nix fish the login shell.
+  #
+  # On judy and work this is one line of NixOS (`users.users.brian.shell`), but
+  # standalone home-manager owns nothing outside $HOME, so it cannot touch
+  # /etc/passwd. The result was two fishes: `programs.fish.enable` put 4.8.1 in
+  # the profile and generated ~/.config/fish/config.fish, while /etc/passwd
+  # still pointed at Debian's /usr/bin/fish (3.6.0). Both read the same
+  # generated config, so the prompt and aliases looked identical and the
+  # version gap was invisible -- the outer shell was 3.6.0 and typing `fish`
+  # inside it got you 4.8.1.
+  #
+  # So: do the privileged bit from activation, which is only tolerable because
+  # this box has passwordless sudo (/etc/sudoers.d/vx). `sudo -n` so a machine
+  # that ever loses that fails fast and visibly instead of hanging activation
+  # on a password prompt nobody is watching.
+  #
+  # ~/.nix-profile/bin/fish rather than a ${pkgs.fish} store path, deliberately:
+  # a store path would rewrite /etc/passwd on every fish update and leave
+  # /etc/shells accumulating dead entries, and it would pin the login shell to
+  # one generation. The profile symlink follows whatever generation is current.
+  # The trade is that `nix-collect-garbage -d` plus a broken generation could
+  # leave the login shell dangling; recover with `ssh vx -t /bin/bash`.
+  home.activation.setLoginShell = lib.hm.dag.entryAfter [ "writeBoundary" ] (
+    let
+      shell = "${config.home.homeDirectory}/.nix-profile/bin/fish";
+    in
+    ''
+      if [ "$(/usr/bin/getent passwd "${config.home.username}" | ${pkgs.coreutils}/bin/cut -d: -f7)" != "${shell}" ]; then
+        # chsh as root ignores /etc/shells, but other things that read it do
+        # not, so keep it listed as a valid login shell either way.
+        if ! ${pkgs.gnugrep}/bin/grep -qxF "${shell}" /etc/shells; then
+          echo "${shell}" | run /usr/bin/sudo -n /usr/bin/tee -a /etc/shells > /dev/null
+        fi
+        run /usr/bin/sudo -n /usr/bin/chsh -s "${shell}" "${config.home.username}"
+      fi
+    ''
+  );
 
   # Purple prompt on the VM. home/core/shell.nix sets the stock tokyo-night
   # preset for every machine; this overrides just the colors with VotingWorks
