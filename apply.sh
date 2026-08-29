@@ -12,6 +12,14 @@ cd "$(dirname "$0")"
 
 HOST="${1:-$(hostname)}"
 
+# NixOS ships two sudos: the setuid wrapper in /run/wrappers/bin, and a plain
+# non-setuid one in systemPackages at /run/current-system/sw/bin. Only PATH
+# order decides which you get, and a shell that puts sw/bin first fails with
+# "must be owned by uid 0 and have the setuid bit set" -- which looks alarming
+# but just means the wrong sudo was found. Pin the wrapper dir first so this
+# script works from any shell.
+PATH="/run/wrappers/bin:$PATH"
+
 if ! nix eval --raw ".#nixosConfigurations.${HOST}.config.networking.hostName" >/dev/null 2>&1; then
   echo "No host '${HOST}' in this flake. Available:" >&2
   nix eval --json '.#nixosConfigurations' --apply builtins.attrNames 2>/dev/null >&2 || true
