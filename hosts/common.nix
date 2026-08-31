@@ -367,6 +367,26 @@
   # Enable the OpenSSH daemon.
   services.openssh.enable = true;
 
+  # Keys only.
+  #
+  # BOTH settings, not just PasswordAuthentication. `UsePAM` is on (it is the
+  # NixOS default and this does not change it), and keyboard-interactive
+  # reaches PAM's password stack by a separate path -- so turning off only the
+  # first leaves `ssh` still offering a password prompt, which is the failure
+  # mode where the setting looks applied and is not.
+  #
+  # Both were previously at their NixOS defaults, which is to say both were
+  # `true`. Every key that needs to reach these machines is already in
+  # `users.users.brian.openssh.authorizedKeys.keys` above.
+  #
+  # The guest is not covered by this -- hosts/vxdev is standalone home-manager
+  # on Debian and owns nothing under /etc -- so it does the same thing from an
+  # activation step. See `disableSshPasswordAuth` in hosts/vxdev/home.nix.
+  services.openssh.settings = {
+    PasswordAuthentication = false;
+    KbdInteractiveAuthentication = false;
+  };
+
   # Open ports in the firewall.
   # networking.firewall.allowedTCPPorts = [ ... ];
   # networking.firewall.allowedUDPPorts = [ ... ];

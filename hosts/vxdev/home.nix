@@ -81,6 +81,63 @@
     ''
   );
 
+  # Turn off password authentication in the guest's sshd.
+  #
+  # Same shape and the same justification as setLoginShell above: a root-owned
+  # file under /etc, which standalone home-manager cannot own, written from
+  # activation because this box has passwordless sudo. The alternative is a
+  # file hand-written into the VM's disk image, which puts it in the same
+  # bucket as the vmguard guest side -- real configuration, recorded nowhere --
+  # and emptying that bucket is most of why this file exists.
+  #
+  # An activation step rather than a step in bootstrap-vm.sh, deliberately.
+  # Bootstrap runs once; this is re-asserted on every switch, so a hand-edit or
+  # a Debian package upgrade that restores a stock config gets undone rather
+  # than quietly persisting.
+  #
+  # BOTH settings, not just PasswordAuthentication: sshd here has `UsePAM yes`,
+  # and keyboard-interactive reaches PAM's password stack by a separate path,
+  # so setting only the first leaves a working password prompt behind.
+  #
+  # Guarded on authorized_keys being non-empty. This is the one step in this
+  # file that can lock you out of the machine it runs on, and a guest with no
+  # key installed would be reachable only over `virsh console vxsuite` from
+  # work. Declining to remove the only working auth method is far cheaper than
+  # that recovery, and the guard makes a fresh-VM bootstrap ordering mistake a
+  # no-op instead of a lockout.
+  #
+  # `sshd -t` before reloading, and reload rather than restart: a bad config
+  # that takes sshd down, or a restart that drops the session activation is
+  # running inside, are both worse outcomes than the change not landing. If the
+  # test fails the drop-in is removed again, so the box is never left with a
+  # config sshd would refuse on its next start.
+  home.activation.disableSshPasswordAuth = lib.hm.dag.entryAfter [ "writeBoundary" ] (
+    let
+      dropIn = "/etc/ssh/sshd_config.d/10-no-password-auth.conf";
+      # Built without a trailing newline so the comparison against `$(cat ...)`
+      # -- which strips one -- is an equality test rather than always true.
+      content = lib.concatStringsSep "\n" [
+        "# Managed by hosts/vxdev/home.nix; edits are reverted on the next switch."
+        "PasswordAuthentication no"
+        "KbdInteractiveAuthentication no"
+      ];
+    in
+    ''
+      if [ ! -s "${config.home.homeDirectory}/.ssh/authorized_keys" ]; then
+        echo "disableSshPasswordAuth: ~/.ssh/authorized_keys is missing or empty -- leaving password auth on."
+      elif [ "$(${pkgs.coreutils}/bin/cat "${dropIn}" 2>/dev/null)" != ${lib.escapeShellArg content} ]; then
+        ${pkgs.coreutils}/bin/printf '%s\n' ${lib.escapeShellArg content} \
+          | run /usr/bin/sudo -n /usr/bin/tee "${dropIn}" > /dev/null
+        if run /usr/bin/sudo -n /usr/sbin/sshd -t; then
+          run /usr/bin/sudo -n /usr/bin/systemctl reload ssh
+        else
+          run /usr/bin/sudo -n /usr/bin/rm -f "${dropIn}"
+          echo "disableSshPasswordAuth: sshd rejected the drop-in; removed it and left sshd untouched." >&2
+        fi
+      fi
+    ''
+  );
+
   # Purple prompt on the VM. home/core/shell.nix sets the stock tokyo-night
   # preset for every machine; this overrides just the colors with VotingWorks
   # purple, so the vxsuite VM's terminals are distinguishable from judy's and
