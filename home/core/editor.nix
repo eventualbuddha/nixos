@@ -15,7 +15,6 @@
     neovim
     ripgrep
     fd
-    gcc
     unzip
     nixd
     # statix (lint) and nixfmt (format) -- the lang.nix LazyVim extra wires
@@ -23,6 +22,14 @@
     # path for either, so they have to come from here (same as nixd above).
     statix
     nixfmt
+    # No `gcc` here, even though treesitter builds parsers with one. A compiler
+    # on the profile PATH is a toolchain, and core carries no toolchains (see
+    # home/core/default.nix) -- the hosts that want an ambient one already get
+    # it from home/toolchains.nix. It also actively breaks vxdev, which imports
+    # core without toolchains.nix: nix's gcc shadows Debian's, and it does not
+    # search /usr/include, so every apt -dev header goes missing and native node
+    # modules stop compiling (node-quirc on <png.h>, with libpng-dev installed).
+    # Debian's own build-essential gcc serves treesitter there just fine.
   ];
 
   # Bootstrap the official LazyVim starter config: LazyVim expects a normal,
