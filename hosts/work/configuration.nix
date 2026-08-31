@@ -9,6 +9,15 @@
   ...
 }:
 
+let
+  # The guest's address on the `vmguard` bridge: a static DHCP reservation
+  # keyed on the guest's MAC in the network definition, so it doesn't drift
+  # (hosts/work/vmguard/NOTES.md item 7).
+  #
+  # Bound to a name because two separate things need it and must not drift
+  # apart: the `Host vx` block below, and the relay's proxy target.
+  guestAddr = "192.168.124.179";
+in
 {
   imports = [
     ./hardware-configuration.nix
@@ -79,13 +88,92 @@
 
   # --- The vxsuite VM --------------------------------------------------------
   #
-  # This is the machine the VM actually runs on, so `ssh vx` needs nothing
-  # host-specific here: the `Host vx` block in ../common.nix points straight at
-  # the guest's address on the local `vmguard` bridge. Other hosts are the ones
-  # that have to add a ProxyJump to reach it.
+  # This is the machine the VM actually runs on, so `ssh vx` is a direct hop
+  # across the bridge. Everything else about the alias -- user, agent
+  # forwarding, connection multiplexing -- comes from the `Host vx` block in
+  # ../common.nix; only the address is host-specific.
   #
   # The guest is defined in libvirt's own state (`virsh dumpxml vxsuite`), not
   # here -- NixOS has no declarative option for libvirt domains.
+  programs.ssh.extraConfig = ''
+    Host vx
+      HostName ${guestAddr}
+  '';
+
+  # --- Inbound SSH to the guest, for clients that can't take two hops --------
+  #
+  # A TCP listener on work that relays to the guest's sshd, so reaching the
+  # guest is one connection rather than a ProxyJump. That exists for two
+  # reasons: an iOS SSH client that will not do ProxyJump with a 1Password key
+  # (which is what a phone has), and judy, where two hops means two YubiKey
+  # touches because the key there is touch-only by design.
+  #
+  # This does NOT weaken the guest's isolation. vmguard blocks guest->internet;
+  # this is host->guest, inbound. The guest still has no route off its own
+  # subnet and the egress proxy is still its only way out -- the same point
+  # NOTES.md item 7 made about the Fedora-era forward that this restores.
+  #
+  # `systemd-socket-proxyd`, NOT a DNAT rule, and the distinction is the whole
+  # reason this is back. libvirt gives an isolated network a pair of
+  # `LIBVIRT_FWI/FWO ... -j REJECT` rules, which drop a DNAT'd packet after it
+  # has been rewritten -- so a nat-table forward really is unworkable here
+  # without an ACCEPT ordered ahead of rules libvirt reinstalls on every network
+  # reload. But those are FORWARD-chain rules, and a userspace relay never
+  # produces forwarded traffic: it accepts on the host and opens its own
+  # connection to the guest, which is locally-originated OUTPUT traffic the
+  # REJECT pair never sees. That is why the Fedora forward worked for years
+  # while a DNAT attempt did not. Two mechanisms, one name; the failure of the
+  # second says nothing about the first.
+  #
+  # A dumb TCP relay is also what makes this safe to publish. The client's SSH
+  # session terminates at the *guest* and verifies the guest's host key; work
+  # carries ciphertext and holds no credential for the guest. A ProxyJump, by
+  # contrast, makes work an authenticated hop, and an `ssh -W` relay would make
+  # it one too.
+  #
+  # No `networking.firewall.allowedTCPPorts` entry, on purpose: the firewall
+  # default-denies inbound and ../common.nix already lists tailscale0 in
+  # `trustedInterfaces`, so binding all interfaces here yields a listener the
+  # tailnet can reach and the LAN cannot. That is strictly tighter than the
+  # Fedora original, which sat on 0.0.0.0:2222 with nothing in front of it.
+  systemd.sockets.vx-ssh-forward = {
+    description = "Listen for SSH connections bound for the vxsuite guest";
+    wantedBy = [ "sockets.target" ];
+    socketConfig.ListenStream = "2222";
+  };
+
+  systemd.services.vx-ssh-forward = {
+    description = "Relay :2222 to the vxsuite guest's sshd";
+    # Started by the socket, so no `wantedBy`. `requires` rather than `wants`:
+    # without the passed-in listening fd this process has nothing to serve.
+    requires = [ "vx-ssh-forward.socket" ];
+    after = [ "vx-ssh-forward.socket" ];
+    serviceConfig = {
+      # Deliberately no `--exit-idle-time`. It would let the relay stop between
+      # sessions and be socket-activated again, which is the tidier shape and
+      # the one home/desktop/tunnels.nix uses -- but the clients this exists for
+      # are a phone and a laptop holding long, mostly-silent sessions, and an
+      # idle process is a much cheaper thing to be wrong about than a dropped
+      # connection from the couch.
+      ExecStart = "${pkgs.systemd}/lib/systemd/systemd-socket-proxyd ${guestAddr}:22";
+      Restart = "on-failure";
+      RestartSec = 2;
+
+      # It moves bytes between two sockets and needs nothing else.
+      DynamicUser = true;
+      NoNewPrivileges = true;
+      PrivateTmp = true;
+      ProtectHome = true;
+      ProtectSystem = "strict";
+      ProtectKernelTunables = true;
+      ProtectControlGroups = true;
+      RestrictAddressFamilies = [
+        "AF_INET"
+        "AF_INET6"
+        "AF_UNIX"
+      ];
+    };
+  };
 
   # --- User identity ---------------------------------------------------------
   #

@@ -38,21 +38,48 @@
     "i915.enable_dc=0"
   ];
 
-  # The vxsuite VM runs on work, on a libvirt network only work can route to,
-  # so reach it by jumping through work. Everything else about the alias --
-  # address, user, agent forwarding, connection multiplexing -- comes from the
-  # `Host vx` block in ../common.nix; this only adds the hop.
+  # The vxsuite VM runs on work, on a libvirt network only work can route to.
+  # Reach it through the TCP relay work publishes on the tailnet (:2222 ->
+  # guest:22, hosts/work/configuration.nix). User, agent forwarding and
+  # connection multiplexing come from the `Host vx` block in ../common.nix;
+  # this supplies the address, which is the one part that differs per machine.
   #
-  # Deliberately not a port forward on work (2222 -> guest:22, the way the
-  # Fedora install did it): libvirt gives an isolated network a pair of
-  # `LIBVIRT_FWI/FWO ... -j REJECT` rules, so a DNAT'd packet gets rewritten and
-  # then dropped on its way into virbr-guard. Making it work means an ACCEPT
-  # ordered ahead of libvirt's own rules, which libvirt reinstalls from scratch
-  # on every network reload. ProxyJump needs nothing on the far end and exposes
-  # no extra port.
+  # This used to be `ProxyJump vx-host.ts`. Three reasons it isn't:
+  #
+  #   - Two authentications means two YubiKey touches. The key here is
+  #     touch-only by design -- setup-ssh-yubikey.sh sets no FIDO PIN and
+  #     deliberately omits `-O verify-required` -- so every signature costs a
+  #     tap: one to authenticate to work, one to the guest. Through the relay
+  #     there is no second hop and no second tap.
+  #   - Two SSH handshakes per connection, which is the cost
+  #     home/desktop/tunnels.nix's master unit exists to amortise and which its
+  #     comments called out by name.
+  #   - The relay is the path a phone has to use regardless (an iOS client that
+  #     won't do ProxyJump with a 1Password key is what prompted building it).
+  #     If judy kept a different path, a broken relay would only ever be
+  #     discovered from the couch, away from the machine that can fix it.
+  #     Sharing it means it fails at a desk instead.
+  #
+  # What this gives up: work's sshd was a second gate on guest access, and now
+  # tailnet membership plus a guest credential is enough. That gate went the
+  # moment the relay existed for the phone -- keeping it for judy alone would
+  # have protected the machine under physical control while the losable one
+  # went without, which is backwards. The answer to a lost device is a
+  # per-device guest key to revoke, not judy's transport.
+  #
+  # Not a DNAT rule on work, which is what the previous version of this comment
+  # ruled out: libvirt's `LIBVIRT_FWI/FWO ... -j REJECT` pair rewrites and then
+  # drops a DNAT'd packet on its way into virbr-guard. Those are FORWARD-chain
+  # rules, and the relay's connection to the guest is locally-originated OUTPUT
+  # traffic they never see -- which is why the Fedora-era userspace forward
+  # worked for years while DNAT did not.
+  #
+  # 100.79.161.93 is work's tailnet address, the same one the `vx-host.ts`
+  # block in ../common.nix carries. Keep the two in step.
   programs.ssh.extraConfig = ''
     Host vx
-      ProxyJump vx-host.ts
+      HostName 100.79.161.93
+      Port 2222
   '';
 
   # judy has 16G RAM and no swap, which meant a heavy from-source build (e.g.

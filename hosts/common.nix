@@ -159,20 +159,29 @@
 
   programs.ssh = {
     extraConfig = ''
-      # The vxsuite VM, a libvirt guest on work. 192.168.124.179 is a static
-      # DHCP reservation (keyed on the guest's MAC) in the `vmguard` network
-      # definition, so it doesn't drift.
+      # The vxsuite VM, a libvirt guest on work.
       #
-      # `vmguard` is an isolated network -- no `<forward>` in its XML -- so that
-      # address is only routable from work itself. hosts/judy adds a ProxyJump
-      # through work to this same name, which is why the alias is `vx` on every
-      # machine rather than one name for local and another for remote.
+      # `HostName` is deliberately NOT set here. `vmguard` is an isolated
+      # network -- no `<forward>` in its XML -- so the guest's address is
+      # routable only from work itself, and every other machine reaches it
+      # through the TCP relay work publishes on the tailnet
+      # (hosts/work/configuration.nix). Those are different addresses, so each
+      # host file supplies its own.
+      #
+      # It could not be defaulted here and overridden per host anyway:
+      # ssh_config is first-value-wins, and the order these `extraConfig`
+      # fragments get concatenated is not something the module system promises.
+      # A default would be silently honoured or silently ignored depending on
+      # evaluation order. What stays here is only what is the same everywhere.
+      #
+      # The alias is still `vx` on every machine rather than one name for local
+      # and another for remote: one name, one host, reached the way each
+      # machine can reach it.
       #
       # ControlMaster/ControlPath: home/desktop/tunnels.nix's per-connection `ssh -W`
       # forwards would otherwise renegotiate a full handshake every time a
-      # browser tab reconnects to localhost:3000 -- two of them where `vx` goes
-      # through the jump host. Sharing one connection makes a reconnect a new
-      # channel on an existing one instead.
+      # browser tab reconnects to localhost:3000. Sharing one connection makes
+      # a reconnect a new channel on an existing one instead.
       #
       # `no` rather than `auto`, though: `tunnel-frontend-master.service` is the
       # only thing that creates the master, connecting with
@@ -196,14 +205,14 @@
       # after its last client, and this master isn't auto-started -- it lives
       # exactly as long as the unit does.
       Host vx
-        HostName 192.168.124.179
         User vx
         ForwardAgent yes
         ControlMaster no
         ControlPath ~/.ssh/cm-%r@%h:%p
 
-      # work itself, over Tailscale. Also the jump host `vx` goes through from
-      # anywhere that isn't work.
+      # work itself, over Tailscale. `vx` no longer jumps through this -- it
+      # goes to work's relay on port 2222 instead -- but this is still how to
+      # reach work's own shell from judy or a phone.
       Host vx-host.ts
         HostName 100.79.161.93
         User brian

@@ -19,12 +19,12 @@
 # The one long-lived piece is `tunnel-frontend-master.service`, which holds a
 # single real SSH connection to vx and does nothing else; every `ssh -W` is a
 # plain client opening a channel over it. That split keeps a browser reconnect
-# from paying a full SSH handshake -- two of them where `vx` goes through a
-# ProxyJump -- but the reason it's a separate unit rather than `ControlMaster
+# from paying a full SSH handshake -- but the reason it's a separate unit
+# rather than `ControlMaster
 # auto` is that it keeps master setup and teardown out of the request path.
 #
 # Pulled in on demand by `tunnel-frontend@`'s `Wants=`, not started at login:
-# the identity that authenticates to vx-host.ts is a touch-only YubiKey-backed
+# the identity that authenticates to the guest is a touch-only YubiKey-backed
 # key, and an eagerly-started master with `Restart=always` reconnects in the
 # background every time the SSH connection drops -- which suspend does every
 # time, on its own timer, with no browser tab open to explain it. That turned
