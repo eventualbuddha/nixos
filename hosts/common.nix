@@ -103,6 +103,29 @@
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
   networking.firewall.allowedUDPPorts = [ config.services.tailscale.port ];
 
+  # Keep DNS out of nsncd's worker pool. On NixOS every glibc NSS lookup --
+  # user, group, AND hostname -- funnels through the nscd socket to nsncd,
+  # which serves them all from 8 worker threads with a 10s handoff timeout.
+  # resolv.conf points at Tailscale MagicDNS (100.100.100.100), which goes
+  # dark for a while after every resume until tailscaled reconnects; a burst
+  # of DNS lookups then wedges all 8 workers, and even purely local lookups
+  # queue behind them for the full 10s. Caught live: nvim frozen 10s inside
+  # getpwuid() -> __nscd_open_socket -> wait_on_socket while opening a
+  # buffer's swapfile (hang-recorder.log, 2026-09-01 08:59, four minutes
+  # after resume). Same stack on any NixOS host with this setup, which is
+  # why it hit both judy and work but never the non-NixOS boxes.
+  #
+  # NSNCD_IGNORE_HOSTS makes nsncd refuse the five host-lookup request types
+  # so glibc falls back to resolving in-process: slow DNS then only blocks
+  # the app doing the lookup, never the shared pool. The trade: in-process
+  # fallback can't load out-of-tree NSS modules (libnss_mymachines/
+  # myhostname have no well-known path on NixOS), so hosts resolution
+  # becomes /etc/hosts + DNS -- which is everything we actually use; glibc
+  # ships its own files/dns modules and NixOS writes the hostname into
+  # /etc/hosts. passwd/group lookups still go through nsncd, NSS modules
+  # intact.
+  systemd.services.nscd.environment.NSNCD_IGNORE_HOSTS = "true";
+
   # 1Password (CLI + GUI, with polkit/browser-integration wrappers).
   programs._1password.enable = true;
   programs._1password-gui = {
