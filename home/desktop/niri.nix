@@ -340,6 +340,7 @@ in
         "Alt+Slash" = typeChar "÷";
         "Alt+5" = typeChar "∞";
         "Alt+Shift+8" = typeChar "°";
+        "Alt+M" = typeChar "µ";
 
         # macOS-style screenshot triad, all on the actual Print Screen key
         # instead of Super+Shift+3/4/5 (freed up below for move-to-workspace).
