@@ -111,9 +111,18 @@ MUTATION_ALLOW = {
     # address a comment -> reply "done in <sha>" -> resolve. Body text, same shape as addComment.
     # Its input can ALSO carry pullRequestReviewId (a PullRequestReview, when the reply belongs to
     # a pending review), which is why _RESOLVE_Q gained that fragment alongside this line.
-    # The REST equivalent (POST /pulls/{n}/comments/{id}/replies) is NOT open — no rule matches
-    # it, so it 403s; a test pins that. Add a path regex if a client ever needs that transport.
+    # The REST equivalent (POST /pulls/{n}/comments/{id}/replies) was NOT open when this was
+    # written; a client needed that transport on 2026-08-27 and it is now REPLY_WRITE_RE below.
     "addpullrequestreviewthreadreply",
+    # Delete a comment (NOTES 49). The other half of the REST rule DELETE_COMMENT_RE below —
+    # the same fallback pattern as the merge and PR-update rules: one client tried REST, 403'd,
+    # and fell through to GraphQL, which 403'd too. Destructive, but at the narrowest possible
+    # grain: one comment the guest could already have edited via updateIssueComment, in a
+    # WRITE_ORGS repo, with the org read off the IssueComment node (that fragment is already in
+    # _RESOLVE_Q, so this needs no resolver change). `deletePullRequestReviewComment` and
+    # `deletePullRequestReview` are deliberately NOT here — nothing has asked, and the deny log
+    # is where that decision comes from.
+    "deleteissuecomment",
     "addlabelstolabelable", "removelabelsfromlabelable",
 }
 
@@ -216,6 +225,52 @@ MERGE_PR_RE = re.compile(
 DELETE_REF_RE = re.compile(
     r"^/repos/(?P<owner>[A-Za-z0-9._-]+)/(?P<repo>[A-Za-z0-9._-]+)"
     r"/git/refs/heads/(?P<ref>(?:[A-Za-z0-9._-]|%2[Ff]|/)+)$")
+
+# Reply to a review thread (REST): POST /repos/{owner}/{repo}/pulls/{n}/comments/{id}/replies.
+# The transport half of `addPullRequestReviewThreadReply`, which has been an allowed mutation
+# since NOTES 41 — the comment there predicted this exact endpoint would eventually be needed
+# and it was, three times in one minute on 2026-08-27 (NOTES 49). So this is transport parity
+# for an existing permission, like PR_UPDATE_RE and MERGE_PR_RE, not a wider write boundary:
+# body text onto a review thread of a PR in a WRITE_ORGS repo.
+#
+# Org-scoped off the RAW path with the same unreserved-only charset as the rules above, and
+# anchored at `/replies` so nothing else under /comments/{id} rides along. Both ids are numeric,
+# which is what the REST route takes (the GraphQL form uses opaque node ids instead).
+REPLY_WRITE_RE = re.compile(
+    r"^/repos/(?P<owner>[A-Za-z0-9._-]+)/(?P<repo>[A-Za-z0-9._-]+)"
+    r"/pulls/[0-9]+/comments/[0-9]+/replies$")
+
+# Delete a comment (REST): DELETE /repos/{owner}/{repo}/issues/comments/{id}. Covers both
+# issue and PR conversation comments — GitHub serves PR conversation comments from the issues
+# route, which is why the path says `issues` for a comment on a PR.
+#
+# Destructive, like DELETE_REF_RE, and narrow in the same way: it drops ONE comment in a repo
+# whose comments the guest can already rewrite wholesale via the long-allowed
+# updateIssueComment. The id is numeric, so no encoding question arises and no subpath can ride
+# along; review comments (/pulls/comments/{id}) and reviews are a DIFFERENT route and stay
+# denied. The paired GraphQL op is `deleteIssueComment` in MUTATION_ALLOW.
+DELETE_COMMENT_RE = re.compile(
+    r"^/repos/(?P<owner>[A-Za-z0-9._-]+)/(?P<repo>[A-Za-z0-9._-]+)"
+    r"/issues/comments/[0-9]+$")
+
+# Rename a branch (REST): POST /repos/{owner}/{repo}/branches/{branch}/rename. Ten denies in a
+# 30-second burst on 2026-09-03 — a batch tidy-up of stale branch names (NOTES 49).
+#
+# This is the most disruptive rule in this file and worth being honest about: unlike a branch
+# DELETE, whose damage is recoverable from the reflog and the merged PR, a rename MOVES a ref
+# that open PRs, CI configs and other people's local checkouts point at. GitHub does retarget
+# open PRs and leave a redirect, so it is not destruction — but it is visible to everyone else
+# working in the repo, which the other writes here mostly are not. It is gated the same way
+# they all are: WRITE_ORGS only, so it cannot reach a repo outside votingworks/eventualbuddha.
+#
+# The branch name has the same %2F problem as DELETE_REF_RE — gh percent-encodes the slashes in
+# `brian/esm-lib-batch-3` — so it takes the same treatment: %2F is the one escape the charset
+# admits, and `_ref_is_plain` then segment-checks the decode so a '..%2F' tail cannot walk up
+# and retarget a repo outside WRITE_ORGS if GitHub normalizes before routing. The NEW name rides
+# in the JSON body and needs no inspection: it can only land inside the repo just authorized.
+RENAME_BRANCH_RE = re.compile(
+    r"^/repos/(?P<owner>[A-Za-z0-9._-]+)/(?P<repo>[A-Za-z0-9._-]+)"
+    r"/branches/(?P<ref>(?:[A-Za-z0-9._-]|%2[Ff]|/)+)/rename$")
 
 def _ref_is_plain(raw_ref):
     """True if the (possibly %2F-encoded) branch decodes to conventional, traversal-free
@@ -681,9 +736,10 @@ READ_ONLY_HOSTS = {"api.mason-registry.dev", "downloads.claude.ai", "herdr.dev",
 
                    # Claude Code's release bucket. `claude install` and the native build's own
                    # self-update fetch their tarballs from here, which is what makes the
-                   # bootstrap in the flake's home/core/claude-code.nix work — claude.ai itself
-                   # is deliberately NOT listed, so the documented `curl claude.ai/install.sh`
-                   # one-liner 403s here and the subcommand is used instead.
+                   # bootstrap in the flake's home/core/claude-code.nix work. claude.ai itself
+                   # was deliberately NOT listed until 2026-09-03, so the documented
+                   # `curl claude.ai/install.sh` one-liner 403'd and the subcommand had to be
+                   # used instead; it is open now (see the NOTES 48 block at the end of this set).
                    #
                    # This whole block was originally Google Antigravity's (install script, update
                    # manifest, Unleash flags, OAuth, userinfo, avatar CDN). Antigravity was
@@ -790,6 +846,37 @@ READ_ONLY_HOSTS = {"api.mason-registry.dev", "downloads.claude.ai", "herdr.dev",
                    # pnpm needs nothing new: vp pulls @pnpm/exe from registry.npmjs.org,
                    # already open above.
                    "unofficial-builds.nodejs.org",
+
+                   # ---- from the deny log, 2026-09-03 (NOTES 48) ----
+                   #
+                   # The ACP tool registry. `GET /registry/v1/latest/registry.json` is a static
+                   # index of agent-client-protocol tools, refetched periodically — 11 denies
+                   # across three days and still recurring, which is what distinguishes it from
+                   # the one-shot entries below. A plain read of a JSON index; nothing is POSTed.
+                   "cdn.agentclientprotocol.com",
+                   #
+                   # claude.ai, for `GET /install.sh` — and this REVERSES the deliberate choice
+                   # recorded on the storage.googleapis.com entry above, which left it closed so
+                   # the documented `curl claude.ai/install.sh` one-liner would 403 and push you
+                   # to `claude install` instead. Opened on request (2026-09-03) because the
+                   # one-liner is what the docs and every upgrade note actually say, and having
+                   # it fail is a papercut rather than a safeguard: the tarball it fetches comes
+                   # from storage.googleapis.com either way, which has been open all along. So
+                   # this admits the entry point to a chain whose payload was already allowed —
+                   # it is not new reach.
+                   "claude.ai",
+                   #
+                   # moshi's image/link CDN (`GET /NZr521Lx`, a short-code path). The narrow
+                   # counterpart to api.getmoshi.app in OPEN_HOSTS: this one is content served
+                   # to the guest, so the read-only tier really does constrain it, unlike the
+                   # WebSocket host that had to go in OPEN_HOSTS (NOTES 42).
+                   "i.getmoshi.app",
+                   #
+                   # Two more doc sites, one 403'd GET each, exactly the item-31 shape: what the
+                   # agent read while working, not what a tool depends on. `support.circleci.com`
+                   # is a distinct host from `circleci.com`, which has its own handler in section
+                   # 3a — entries here are exact hosts, so this grants nothing there.
+                   "vitest.dev", "support.circleci.com",
                    }
 
 # Exact POST paths permitted on a READ_ONLY_HOSTS host, as {host: {paths}}. Everything else on
@@ -1008,9 +1095,10 @@ def _handle_codeload(flow):
 
 def _handle_github_api(flow):
     """api.github.com: REST reads (GET/HEAD) and GraphQL reads always allowed; GraphQL
-    mutations allowed only for PR/issue ops scoped to WRITE_ORGS. The three REST write
-    families (stacked PRs, reviewer requests, branch deletion) are org-gated off the URL
-    path. PAT injected host-side. Everything else denied."""
+    mutations allowed only for PR/issue ops scoped to WRITE_ORGS. The REST write families
+    (stacked PRs, reviewer requests, review replies, PR update/merge, branch delete/rename,
+    comment deletion) are org-gated off the URL path. PAT injected host-side. Everything
+    else denied."""
     m = flow.request.method
     path_only = flow.request.path.split("?", 1)[0]
     if m in API_READ_METHODS:
@@ -1035,6 +1123,12 @@ def _handle_github_api(flow):
         mo = REVIEWERS_WRITE_RE.match(path_only)           # add a reviewer
         if mo:
             return _path_write_decision(flow, mo, "reviewer request on", reviewers=True)
+        mo = REPLY_WRITE_RE.match(path_only)               # reply to a review thread
+        if mo:
+            return _path_write_decision(flow, mo, "review reply in", reply=True)
+        mo = RENAME_BRANCH_RE.match(path_only)             # rename a branch
+        if mo and _ref_is_plain(mo.group("ref")):
+            return _path_write_decision(flow, mo, "branch rename in", ref=mo.group("ref"))
     if m == "PATCH":
         mo = PR_UPDATE_RE.match(path_only)                 # retarget/edit a PR (restacking)
         if mo:
@@ -1047,6 +1141,9 @@ def _handle_github_api(flow):
         mo = DELETE_REF_RE.match(path_only)                # post-merge branch cleanup
         if mo and _ref_is_plain(mo.group("ref")):
             return _path_write_decision(flow, mo, "branch delete in", ref=mo.group("ref"))
+        mo = DELETE_COMMENT_RE.match(path_only)            # drop one issue/PR comment
+        if mo:
+            return _path_write_decision(flow, mo, "comment delete in", comment=True)
     return _deny(flow, "api.github.com write/mutation denied", op="write")
 
 def _handle_github_web(flow):

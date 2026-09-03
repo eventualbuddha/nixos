@@ -39,6 +39,16 @@
     username = "vx";
     homeDirectory = "/home/vx";
     stateVersion = "25.05";
+
+    # Turborepo phones home to telemetry.vercel.com on every task, and the
+    # vmguard proxy denies it -- correctly, since it is an outbound POST channel
+    # and the gate exists to stop those. The problem is not the denial but the
+    # volume: 4055 of the 4153 deny records in the log on 2026-09-03 were this
+    # one endpoint, which buries the denies that mean a tool is actually broken.
+    # Filtering it out of the deny-log queries (as README does for datadog)
+    # treats the symptom; not sending it is the fix, and turbo has a documented
+    # switch for exactly this. See NOTES 50.
+    sessionVariables.TURBO_TELEMETRY_DISABLED = "1";
   };
 
   programs.home-manager.enable = true;

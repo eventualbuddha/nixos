@@ -701,11 +701,9 @@ check("gb/blog_post",        gh("/git-worktrees", "POST", host="blog.gitbutler.c
 check("gb/api_denied",       gh("/x", "GET", host="api.gitbutler.com"), "deny")
 check("gb/bare_denied",      gh("/x", "GET", host="gitbutler.io"), "deny")
 
-# REST review-thread replies are NOT open (NOTES 41): no POST rule matches this path, so the
-# GraphQL mutation is the only route. Pinned so the answer is recorded, not re-derived.
-check("api/rest_reply_denied", gh("/repos/votingworks/vxsuite/pulls/42/comments/12345/replies", "POST", host="api.github.com"), "deny")
-# ...and it stays denied even for an allowed org, i.e. it is the PATH that isn't open, not the org
-check("api/rest_reply_denied_org", gh("/repos/eventualbuddha/x/pulls/1/comments/2/replies", "POST", host="api.github.com"), "deny")
+# REST review-thread replies were NOT open when NOTES 41 landed — the GraphQL mutation was the
+# only route. A client needed the REST transport on 2026-08-27, so it is now open and org-gated
+# (NOTES 49); the cases live in the review-reply block below.
 
 # ---- turborepo.dev (NOTES 40): the older domain a turbo.json "$schema" still points at ----
 check("ro/turborepo_schema", gh("/schema.json", "GET", host="turborepo.dev"), "allow")
@@ -875,6 +873,90 @@ check("vp/no_creds",         hdrs("/download/release/index.json", "GET", "unoffi
 check("vp/bare_nodejs_org",  gh("/dist/index.json", "GET", host="nodejs.org"), "allow")
 check("vp/unofficial_bare",  gh("/download/release/index.json", "GET", host="unofficial-builds.org"), "deny")
 check("vp/nodejs_sub",       gh("/download/release/index.json", "GET", host="builds.nodejs.org"), "deny")
+
+# ---- review-thread replies (REST), NOTES 49: transport parity with the GraphQL mutation ----
+check("reply/allowed",         gh("/repos/votingworks/vxsuite/pulls/9222/comments/3865257849/replies", "POST", host=API), "allow")
+check("reply/other_org",       gh("/repos/eventualbuddha/dotfiles/pulls/1/comments/2/replies", "POST", host=API), "allow")
+check("reply/org_case_insens", gh("/repos/VotingWorks/vxsuite/pulls/1/comments/2/replies", "POST", host=API), "allow")
+check("reply/forbidden_org",   gh("/repos/torvalds/linux/pulls/1/comments/2/replies", "POST", host=API), "deny")
+# the org rides on the path, so no percent-encoded tail may retarget it (as in the rules above)
+check("reply/pct_traversal",
+      gh("/repos/votingworks/vxsuite%2f..%2f..%2ftorvalds%2flinux/pulls/1/comments/2/replies", "POST", host=API), "deny")
+# anchored at /replies with numeric ids on both sides — nothing else under the PR rides along
+check("reply/nonnumeric_comment", gh("/repos/votingworks/vxsuite/pulls/1/comments/abc/replies", "POST", host=API), "deny")
+check("reply/nonnumeric_pr",   gh("/repos/votingworks/vxsuite/pulls/x/comments/2/replies", "POST", host=API), "deny")
+check("reply/no_replies_seg",  gh("/repos/votingworks/vxsuite/pulls/1/comments/2", "POST", host=API), "deny")
+check("reply/subpath",         gh("/repos/votingworks/vxsuite/pulls/1/comments/2/replies/3", "POST", host=API), "deny")
+# only POST: editing or dropping a review comment is a different route and stays shut
+check("reply/patch_denied",    gh("/repos/votingworks/vxsuite/pulls/1/comments/2/replies", "PATCH", host=API), "deny")
+check("reply/delete_denied",   gh("/repos/votingworks/vxsuite/pulls/1/comments/2", "DELETE", host=API), "deny")
+
+# ---- comment deletion (REST), NOTES 49: one comment, org-gated ----
+check("delcomment/allowed",      gh("/repos/votingworks/vxsuite/issues/comments/5195760611", "DELETE", host=API), "allow")
+check("delcomment/other_org",    gh("/repos/eventualbuddha/dotfiles/issues/comments/7", "DELETE", host=API), "allow")
+check("delcomment/org_case",     gh("/repos/VotingWorks/vxsuite/issues/comments/7", "DELETE", host=API), "allow")
+check("delcomment/forbidden_org",gh("/repos/torvalds/linux/issues/comments/7", "DELETE", host=API), "deny")
+check("delcomment/pct_traversal",
+      gh("/repos/votingworks/vxsuite%2f..%2f..%2ftorvalds%2flinux/issues/comments/7", "DELETE", host=API), "deny")
+# numeric id only, anchored — no subpath, and the issue itself is NOT deletable through this
+check("delcomment/nonnumeric",   gh("/repos/votingworks/vxsuite/issues/comments/abc", "DELETE", host=API), "deny")
+check("delcomment/subpath",      gh("/repos/votingworks/vxsuite/issues/comments/7/reactions", "DELETE", host=API), "deny")
+check("delcomment/issue_itself", gh("/repos/votingworks/vxsuite/issues/7", "DELETE", host=API), "deny")
+# review comments and reviews are a different route and were not opened
+check("delcomment/review_comment", gh("/repos/votingworks/vxsuite/pulls/comments/7", "DELETE", host=API), "deny")
+# ...and the paired GraphQL op is allowed, which is what the REST 403 used to fall through to
+check("delcomment/gql", decide("mutation{deleteIssueComment(input:$i){clientMutationId}}",
+                              {"input": {"id": "IC_1"}}, {"votingworks"}), "mutation-ok")
+check("delcomment/gql_forbidden_org",
+      decide("mutation{deleteIssueComment(input:$i){clientMutationId}}",
+             {"input": {"id": "IC_9"}}, {"torvalds"}), "deny")
+
+# ---- branch rename (REST), NOTES 49: org-gated, same %2F handling as the delete rule ----
+check("rename/plain",          gh("/repos/votingworks/vxsuite/branches/main/rename", "POST", host=API), "allow")
+check("rename/pct_slash",      gh("/repos/votingworks/vxsuite/branches/brian%2Fesm-lib-batch-3/rename", "POST", host=API), "allow")
+check("rename/literal_slash",  gh("/repos/votingworks/vxsuite/branches/brian/vitest-5/rename", "POST", host=API), "allow")
+check("rename/dotted",         gh("/repos/votingworks/vxsuite/branches/release-1.2.3/rename", "POST", host=API), "allow")
+check("rename/other_org",      gh("/repos/eventualbuddha/dotfiles/branches/wip/rename", "POST", host=API), "allow")
+check("rename/org_case",       gh("/repos/VotingWorks/vxsuite/branches/wip/rename", "POST", host=API), "allow")
+check("rename/forbidden_org",  gh("/repos/torvalds/linux/branches/master/rename", "POST", host=API), "deny")
+# traversal through the branch segment, encoded and literal, must not retarget the repo
+check("rename/pct_traversal_ref",
+      gh("/repos/votingworks/vxsuite/branches/..%2F..%2F..%2F..%2Ftorvalds%2Flinux%2Fbranches%2Fmaster/rename",
+         "POST", host=API), "deny")
+check("rename/dot_segment",    gh("/repos/votingworks/vxsuite/branches/a/./b/rename", "POST", host=API), "deny")
+check("rename/empty_segment",  gh("/repos/votingworks/vxsuite/branches/a//b/rename", "POST", host=API), "deny")
+check("rename/other_escape",   gh("/repos/votingworks/vxsuite/branches/%2e%2e%2Fx/rename", "POST", host=API), "deny")
+check("rename/pct_traversal_repo",
+      gh("/repos/votingworks/vxsuite%2f..%2f..%2ftorvalds%2flinux/branches/main/rename", "POST", host=API), "deny")
+# anchored at /rename: the branches API's other endpoints stay shut, and so do other methods
+check("rename/no_rename_seg",  gh("/repos/votingworks/vxsuite/branches/main", "POST", host=API), "deny")
+check("rename/protection",     gh("/repos/votingworks/vxsuite/branches/main/protection", "POST", host=API), "deny")
+check("rename/delete_denied",  gh("/repos/votingworks/vxsuite/branches/main/rename", "DELETE", host=API), "deny")
+# reads on the branches API were already open through the GET/HEAD rule
+check("rename/list_get",       gh("/repos/votingworks/vxsuite/branches", "GET", host=API), "allow")
+
+# ---- the read-only hosts added 2026-09-03 (NOTES 48) ----
+check("ro48/acp_registry",   gh("/registry/v1/latest/registry.json", "GET", host="cdn.agentclientprotocol.com"), "allow")
+check("ro48/acp_head",       gh("/registry/v1/latest/registry.json", "HEAD", host="cdn.agentclientprotocol.com"), "allow")
+check("ro48/acp_post",       gh("/registry/v1/latest/registry.json", "POST", host="cdn.agentclientprotocol.com"), "deny")
+check("ro48/acp_bare",       gh("/registry.json", "GET", host="agentclientprotocol.com"), "deny")
+# claude.ai: the install one-liner, which used to 403 on purpose (see the NOTES 48 comment)
+check("ro48/claude_install", gh("/install.sh", "GET", host="claude.ai"), "allow")
+check("ro48/claude_post",    gh("/api/organizations", "POST", host="claude.ai"), "deny")
+check("ro48/claude_no_creds", hdrs("/install.sh", "GET", "claude.ai"), {})
+# ...and its payload host was already open, which is why this is an entry point, not new reach
+check("ro48/claude_tarball", gh("/claude-code-dist/x.tar.gz", "GET", host="storage.googleapis.com"), "allow")
+# i.getmoshi.app is the read-only counterpart to api.getmoshi.app in OPEN_HOSTS
+check("ro48/moshi_img",      gh("/NZr521Lx", "GET", host="i.getmoshi.app"), "allow")
+check("ro48/moshi_img_post", gh("/NZr521Lx", "POST", host="i.getmoshi.app"), "deny")
+check("ro48/moshi_api_open", gh("/collect", "POST", host="api.getmoshi.app"), "allow")
+# doc sites, GET-only
+check("ro48/vitest_docs",    gh("/guide/mocking/modules", "GET", host="vitest.dev"), "allow")
+check("ro48/vitest_post",    gh("/guide/mocking/modules", "POST", host="vitest.dev"), "deny")
+check("ro48/circle_support", gh("/hc/en-us/articles/5645222646939-Data-retention-policy", "GET", host="support.circleci.com"), "allow")
+check("ro48/circle_support_post", gh("/hc/en-us", "POST", host="support.circleci.com"), "deny")
+# exact hosts: support.circleci.com is not circleci.com, which has its own handler (section 3a)
+check("ro48/circle_support_no_creds", hdrs("/hc/en-us", "GET", "support.circleci.com"), {})
 
 try:
     os.remove(os.environ["VMGUARD_DENYLOG"])

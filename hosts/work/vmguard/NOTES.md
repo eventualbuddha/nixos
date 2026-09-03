@@ -1365,6 +1365,105 @@ needs doing, and how to back everything out.
       `nodejs.org` itself stays allowed.
     - **Deploy: `./apply.sh`** from the flake root, as item 46 records.
 
+48. **Five hosts opened read-only from a deny-log sweep (2026-09-03).** A full pass over
+    `requests.log` plus its 8 rotated archives (2026-08-26 → 2026-09-03), which is the first
+    review since the NixOS port. 9298 denies total; dropping the two the README already
+    filters as deliberate noise (5111 datadog, 34 mcp-proxy) leaves 4153, of which 4055 were
+    one telemetry endpoint (item 50) and 98 everything else. Of those 98:
+    - **Already fixed, and worth recording so the next sweep does not re-open them.**
+      `nixos.org` (1 deny, 08-28) and `unofficial-builds.nodejs.org` (12, 08-29) both predate
+      the commits that allowlisted them the same week (items 46 and 47). A deny-log entry is
+      evidence of a gap *at that timestamp*, not of a gap now — check the date against the
+      rule's commit before acting on it.
+    - **Left blocked, deliberately.** `example.com` (4) is the connectivity smoke test that is
+      *supposed* to 403 — it is how you tell the gate is up. `api.anthropic.com` (44, all
+      08-27..08-30, nothing since) should never reach this addon at all: the unit tunnels it
+      with `--ignore-hosts '^api\.anthropic\.com:443$'`, so anything that lands here arrived on
+      some other port. Two paths, `/api/event_logging/v2/batch` and `/v1/environments/bridge`,
+      both telemetry-shaped. It stopped on its own; if it comes back the fix is the unit's
+      ignore-hosts pattern, not a READ_ONLY_HOSTS entry, which would bump TLS on the one host
+      whose whole point is that it is not bumped.
+    - **Opened**, all in `READ_ONLY_HOSTS` (GET/HEAD, no creds):
+      - `cdn.agentclientprotocol.com` — `GET /registry/v1/latest/registry.json`, the ACP tool
+        registry. 11 denies across three days and *still recurring*, which is what separates it
+        from the one-shot entries below: something refetches it on a timer and keeps failing.
+      - `claude.ai` — `GET /install.sh` (4). **This reverses a deliberate decision**: the
+        storage.googleapis.com comment recorded leaving claude.ai shut so the documented
+        `curl claude.ai/install.sh` one-liner would 403 and push you to `claude install`
+        instead. Reopened on request, because the one-liner is what the docs actually say and
+        the tarball it fetches comes from storage.googleapis.com, which has been open the whole
+        time — so this admits the entry point to a chain whose payload was already allowed. Not
+        new reach; the comment on that entry was updated rather than left contradicting the code.
+      - `i.getmoshi.app` — `GET /NZr521Lx` (4), moshi's image/link CDN. The narrow counterpart
+        to `api.getmoshi.app` in OPEN_HOSTS: this one serves content *to* the guest, so unlike
+        the WebSocket host of item 42 the read-only tier genuinely constrains it.
+      - `vitest.dev`, `support.circleci.com` — one GET each, doc pages. Exactly the item-31
+        shape: what the agent read while working, not what a tool depends on, and opening them
+        is whack-a-mole by nature. Note `support.circleci.com` is a *different host* from
+        `circleci.com`, which has its own handler (section 3a) — entries here are exact hosts,
+        so this grants nothing on the credentialed one.
+
+49. **Three more api.github.com writes: review replies, comment deletion, branch rename
+    (2026-09-03).** The rest of that same sweep. All three were in `votingworks/vxsuite`, i.e.
+    already inside WRITE_ORGS — they were denied because no path rule covered the op, which is
+    the "a tool is actually broken" class the deny log exists to surface.
+    - **`POST /repos/{o}/{r}/pulls/{n}/comments/{id}/replies`** (3 denies, 08-27) →
+      `REPLY_WRITE_RE`. Transport parity, not new permission: `addPullRequestReviewThreadReply`
+      has been an allowed mutation since item 41, and the comment there *predicted this exact
+      endpoint* would eventually be needed ("add a path regex if a client ever needs that
+      transport"). It did. The test that pinned it as denied is replaced by the block that
+      pins it allowed-and-org-gated.
+    - **`DELETE /repos/{o}/{r}/issues/comments/{id}`** (2 denies, 08-31) → `DELETE_COMMENT_RE`,
+      plus **`deleteIssueComment`** in `MUTATION_ALLOW`. Both halves, because the log shows the
+      client doing what the merge attempt in item 31 did: try REST, 403, fall through to
+      GraphQL, 403 again, 26 seconds later. Destructive but at the narrowest grain there is —
+      one comment, in a repo whose comments the guest could already rewrite wholesale via the
+      long-allowed `updateIssueComment`. Needed no resolver change: the `IssueComment` fragment
+      has been in `_RESOLVE_Q` since item 41's audit. `deletePullRequestReviewComment` and
+      `deletePullRequestReview` are a different route and stay denied.
+    - **`POST /repos/{o}/{r}/branches/{branch}/rename`** (10 denies in 30 seconds, 09-03, a
+      batch tidy-up of stale names) → `RENAME_BRANCH_RE`. **The most disruptive rule in the
+      file**, and worth saying plainly: unlike a branch DELETE, whose damage is recoverable
+      from the reflog and the merged PR, a rename MOVES a ref that open PRs, CI configs and
+      other people's checkouts point at. GitHub retargets open PRs and leaves a redirect, so it
+      is not destruction — but it is visible to everyone else in the repo, which the other
+      writes here mostly are not. Gated identically: WRITE_ORGS only.
+    - The branch names arrive percent-encoded (`brian%2Fesm-lib-batch-3`), so the rename rule
+      takes `DELETE_REF_RE`'s treatment exactly — `%2F` is the one escape the charset admits,
+      and `_ref_is_plain` segment-checks the decode so a `..%2F` tail cannot walk up and
+      retarget a repo outside WRITE_ORGS. The new name rides in the JSON body and needs no
+      inspection: it can only land inside the repo just authorized.
+    - Tests now 536 cases (+53): allow/deny per org and per case-folding, `%2F` and literal
+      traversal through both the repo and the ref segment, non-numeric ids, subpaths and
+      neighbouring endpoints (`/branches/{b}/protection`, `/issues/{n}`, `/pulls/comments/{id}`)
+      pinned denied, wrong methods denied, and the paired `deleteIssueComment` mutation both
+      ways. Plus the item-48 hosts: GET/HEAD through, POST denied, no creds injected, and
+      exact-host denies (`agentclientprotocol.com` bare).
+    - **Deploy: `./apply.sh`** from the flake root, as item 46 records.
+
+50. **Turborepo telemetry: silenced in the guest, still denied at the gate (2026-09-03).**
+    `POST telemetry.vercel.com/api/turborepo/v1/events` was **4055 of the 4153** deny records
+    in the sweep above once the two known-noise hosts are dropped — 97% of what was left, and
+    43% of every deny record in the archive. Three options were on the table and the middle one
+    was taken:
+    - *Allowlist it* — rejected. It is a POST with a body, so it cannot ride READ_ONLY_HOSTS
+      (GET/HEAD only) and would need an OPEN_HOSTS-shaped exception: an unrestricted outbound
+      body channel to a third party, which is the exact thing this gate exists to prevent.
+    - *Filter it out of the deny-log queries*, the way README already does for datadog and
+      mcp-proxy — treats the symptom. The cost of the noise is not that it is ugly, it is that
+      it buries the ~2% of denies that mean something is broken; the item-49 findings were
+      sitting under 4000 lines of it.
+    - **Stop sending it**, which is what was done: `TURBO_TELEMETRY_DISABLED = "1"` in
+      `home.sessionVariables` in `hosts/vxdev/home.nix`. The guest's shells both pick up
+      hm-session-vars (bash via the `bashrcExtra` line, fish natively), so turbo inherits it
+      from any shell that runs a build. The gate is unchanged and still denies the host, so
+      this is defence in depth rather than a replacement for the rule — anything that runs
+      turbo without the variable still 403s.
+    - **This half deploys inside the guest, not from here.** `apply.sh` activates the machine
+      it is run on, so the addon change (items 48/49) goes out with `./apply.sh` on `work`,
+      while this variable needs `./apply.sh vx@vxdev` run in the VM — the flake is checked out
+      there too. Doing only the host half leaves the gate correct and the log still noisy.
+
 ## Running it: `Justfile` (RETIRED)
 
 > **THE JUSTFILE IS GONE, DELETED IN THE NIXOS PORT (2026-08-28).** This section, and the two
