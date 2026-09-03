@@ -170,6 +170,10 @@ in
           };
           clip-to-geometry = true;
         }
+        {
+            matches = [ { app-id = "localsend_app"; } ];
+            open-floating = true;
+        }
       ];
 
       layer-rules = [

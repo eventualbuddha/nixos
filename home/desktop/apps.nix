@@ -23,5 +23,6 @@
   home.packages = with pkgs; [
     vesktop
     pear-desktop # formerly `youtube-music`
+    localsend
   ];
 }
