@@ -75,6 +75,8 @@ in
     # ./claude-code.nix for why it is bootstrapped rather than installed.
     uv # python project/venv/interpreter management (pip/poetry/pyenv replacement)
     herdr
+
+    brightnessctl
   ];
 
   # Per-project toolchain pinning: a project's own flake.nix/shell.nix +

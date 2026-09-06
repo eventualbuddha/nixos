@@ -392,6 +392,19 @@ in
         "Mod+Shift+3".action.move-column-to-workspace = 3;
         "Mod+Shift+4".action.move-column-to-workspace = 4;
         "Mod+Shift+5".action.move-column-to-workspace = 5;
+
+        "XF86MonBrightnessUp".action.spawn = [
+          "brightnessctl"
+          "--class=backlight"
+          "set"
+          "+10%"
+        ];
+        "XF86MonBrightnessDown".action.spawn = [
+          "brightnessctl"
+          "--class=backlight"
+          "set"
+          "10%-"
+        ];
       };
     };
   };
