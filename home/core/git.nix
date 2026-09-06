@@ -78,7 +78,5 @@ in
 
   # mkDefault so a machine with a different key set (the vxsuite build VM)
   # can render its own without mkForce -- see hosts/vxdev/home.nix.
-  xdg.configFile."git/allowed_signers".text = lib.mkDefault (
-    signingData.render lib signingData.keys
-  );
+  xdg.configFile."git/allowed_signers".text = lib.mkDefault (signingData.render lib signingData.keys);
 }

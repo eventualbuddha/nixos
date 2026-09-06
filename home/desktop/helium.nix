@@ -38,39 +38,40 @@ let
       url = "https://github.com/imputnet/helium-linux/releases/download/${version}/helium-${version}-x86_64.AppImage";
       sha256 = "1psgyij2jdqcjvbxfca1w6nkp0wjxdqny635ya29b2a8z0cq8cgv";
     };
-    extraPkgs = pkgs: with pkgs; [
-      alsa-lib
-      at-spi2-atk
-      at-spi2-core
-      atk
-      cairo
-      cups
-      dbus
-      expat
-      gdk-pixbuf
-      glib
-      gtk3
-      libdrm
-      libGL
-      libnotify
-      libpulseaudio
-      libxkbcommon
-      mesa
-      nspr
-      nss
-      pango
-      pipewire
-      systemd
-      wayland
-      libx11
-      libxcomposite
-      libxdamage
-      libxext
-      libxfixes
-      libxrandr
-      libxcb
-      libxshmfence
-    ];
+    extraPkgs =
+      pkgs: with pkgs; [
+        alsa-lib
+        at-spi2-atk
+        at-spi2-core
+        atk
+        cairo
+        cups
+        dbus
+        expat
+        gdk-pixbuf
+        glib
+        gtk3
+        libdrm
+        libGL
+        libnotify
+        libpulseaudio
+        libxkbcommon
+        mesa
+        nspr
+        nss
+        pango
+        pipewire
+        systemd
+        wayland
+        libx11
+        libxcomposite
+        libxdamage
+        libxext
+        libxfixes
+        libxrandr
+        libxcb
+        libxshmfence
+      ];
   };
 
 in

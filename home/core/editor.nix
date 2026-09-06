@@ -22,6 +22,7 @@
     # path for either, so they have to come from here (same as nixd above).
     statix
     nixfmt
+    nixfmt-tree
     # No `gcc` here, even though treesitter builds parsers with one. A compiler
     # on the profile PATH is a toolchain, and core carries no toolchains (see
     # home/core/default.nix) -- the hosts that want an ambient one already get

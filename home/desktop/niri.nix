@@ -5,15 +5,13 @@ let
   # `osConfig` is home-manager's NixOS-module special arg for the host's
   # full system config, always available without extra flake wiring.
   isJudy = osConfig.networking.hostName == "judy";
-in
 
-# NB: no `imports` here for niri's home-manager module. The NixOS module
-# (`programs.niri.enable = true;` in hosts/common.nix) already
-# auto-imports `niri.homeModules.config` (settings only) for every user and
-# wires up the correct package -- importing `homeModules.niri` again here
-# would redeclare `programs.niri.package`/`enable` and fail to eval.
+  # NB: no `imports` here for niri's home-manager module. The NixOS module
+  # (`programs.niri.enable = true;` in hosts/common.nix) already
+  # auto-imports `niri.homeModules.config` (settings only) for every user and
+  # wires up the correct package -- importing `homeModules.niri` again here
+  # would redeclare `programs.niri.package`/`enable` and fail to eval.
 
-let
   screenRecordToggle = pkgs.writeShellScriptBin "screen-record-toggle" ''
     set -euo pipefail
     DIR="$HOME/Videos/Recordings"
@@ -171,8 +169,8 @@ in
           clip-to-geometry = true;
         }
         {
-            matches = [ { app-id = "localsend_app"; } ];
-            open-floating = true;
+          matches = [ { app-id = "localsend_app"; } ];
+          open-floating = true;
         }
       ];
 

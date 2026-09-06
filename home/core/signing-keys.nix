@@ -48,7 +48,7 @@
   # no import of nixpkgs.
   render =
     lib: keys:
-    lib.concatMapStrings (
-      entry: "${lib.concatStringsSep "," entry.principals} ${entry.key}\n"
-    ) (lib.attrValues keys);
+    lib.concatMapStrings (entry: "${lib.concatStringsSep "," entry.principals} ${entry.key}\n") (
+      lib.attrValues keys
+    );
 }
