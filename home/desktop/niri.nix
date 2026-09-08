@@ -351,6 +351,11 @@ in
           show-pointer = false;
         }; # fullscreen
         "Ctrl+Print".action.spawn = [ "screen-record-toggle" ]; # toggle recording
+        "Ctrl+Alt+Shift+4".action.screenshot = [ ]; # interactive area select
+        "Ctrl+Alt+Shift+3".action.screenshot-screen = {
+          show-pointer = false;
+        };
+        "Ctrl+Alt+Shift+5".action.spawn = [ "screen-record-toggle" ]; # toggle recording
 
         "Mod+O".action.toggle-overview = [ ];
 
