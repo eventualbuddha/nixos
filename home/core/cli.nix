@@ -12,14 +12,14 @@ let
   # `hash` (via `nix store prefetch-file --json <release-url>`) to update.
   herdr =
     let
-      version = "0.8.2";
+      version = "0.9.0";
     in
     pkgs.stdenvNoCC.mkDerivation {
       pname = "herdr";
       inherit version;
       src = pkgs.fetchurl {
         url = "https://github.com/herdrdev/herdr/releases/download/v${version}/herdr-linux-x86_64";
-        hash = "sha256-l2FQoU1JDJSyQ+ouGn6y37Z/EuNrGC25CTb2co5q7PQ=";
+        hash = "sha256-T6GgEVjdgEPaktMbJweAsNzBBgMDjZthysTYGrY/tx8=";
       };
       dontUnpack = true;
       installPhase = ''
