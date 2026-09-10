@@ -1128,6 +1128,7 @@ needs doing, and how to back everything out.
     v1.1 `…/{build}/retry`, `app.circleci.com` (the SPA; the workflow uuid is already readable
     from the GitHub check-run URL), and `circleci-tasks-prod.s3.us-east-1.amazonaws.com`, which
     shows up in the log serving snapshot diffs and is a separate question from this one.
+    (That last one was asked and answered separately — **opened read-only in item 51**.)
 
     - Tests now 440 cases (+61): the read tier unchanged and uncredentialed; every allowed rerun
       shape; the org gate against votingworks/eventualbuddha/torvalds and all four malformed
@@ -1463,6 +1464,51 @@ needs doing, and how to back everything out.
       it is run on, so the addon change (items 48/49) goes out with `./apply.sh` on `work`,
       while this variable needs `./apply.sh vx@vxdev` run in the VM — the flake is checked out
       there too. Doing only the host half leaves the gate correct and the log still noisy.
+
+51. **CircleCI's presigned-S3 artifact bucket opened read-only (2026-09-10, on request).**
+    `circleci-tasks-prod.s3.us-east-1.amazonaws.com` — the four newest denies in the log and the
+    only CI host in it, against 196 datadog and 72 turbo-telemetry records that are noise we
+    block on purpose (item 50 for the latter). The requests are plain artifact reads:
+
+    ```
+    GET /storage/artifacts/81c7f65e-…/ac5b5cf2-…/0/apps/mark-scan/integration-testing/
+        test-results/server-output.log?X-Amz-Algorithm=AWS4-HMAC-SHA256&…&X-Amz-Expires=60&…
+    GET …/test-results/screenshots-basic-election-flow-chromium/error-context.md?…
+    ```
+
+    …i.e. a failed mark-scan integration run's server log and playwright error context, fetched
+    twice (the second attempt 40s after the first — the presigned URL had been re-minted, so this
+    was someone retrying, not a redirect loop).
+
+    **This is item 43's explicit deferral, now answered.** That item listed this host under
+    "deliberately not opened … a separate question from this one", correctly: it arrived in the
+    log while a *credentialed write* was being added, and bundling an unrelated read into that
+    review would have been the wrong way to decide it. Asked on its own it is a much smaller
+    question, and the answer is the one item 30 already gave for the other artifact host.
+
+    **Same shape as `output.circle-artifacts.com` (item 30), and additive to it — not a
+    replacement.** CircleCI has two artifact fronts and this is the second; opening the frontend
+    in item 30 left the presigned-S3 payloads still 403ing, the same redirect-target gap item 30
+    itself was about. The old host is left in place: nothing says it stopped serving anything, and
+    removing it on that guess would break artifact reads on any project still using it.
+
+    **What the entry does and does not give.** It is a plain `READ_ONLY_HOSTS` line, so GET/HEAD
+    only and **no credential is injected** — neither `GH_PAT` nor `CIRCLE_TOKEN` (asserted by two
+    tests). It needs none: the URL carries its own AWS SigV4 signature with a 60-second
+    `X-Amz-Expires`, minted by CircleCI for whoever already had API access to ask. The guest
+    cannot mint one itself, which is worth stating plainly — this entry is only useful to a guest
+    that already got a signed URL through the credentialed `circleci.com` read path.
+
+    **Exact host, as always.** `circleci-tasks-staging.…` and the region-bare
+    `circleci-tasks-prod.s3.amazonaws.com` are both pinned as denied by tests; the entry covers
+    one bucket in one region, which is all the log shows. Should a second region appear, it will
+    appear as a deny and can be added then.
+
+    - Tests now 544 cases (+9 net): the read allowed with its signature intact, HEAD allowed,
+      PUT/POST/DELETE denied, the staging and region-bare neighbours denied, and the two
+      no-credential assertions. The old `ci/tasks_s3_denied` pin from item 43 is **removed** —
+      it asserted exactly the behaviour this item reverses, so leaving it would have failed.
+    - Deploy: `./apply.sh` on `work`. Host-side only; nothing changes in the guest.
 
 ## Running it: `Justfile` (RETIRED)
 

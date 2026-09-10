@@ -582,9 +582,8 @@ check("ci/rerun_traversal",  circle(f"/api/v2/workflow/{WF}/../../x/rerun", "POS
 check("ci/rerun_put",        circle(RERUN, "PUT"), "deny")
 check("ci/rerun_delete",     circle(RERUN, "DELETE"), "deny")
 check("ci/rerun_patch",      circle(RERUN, "PATCH"), "deny")
-# neighbours ride nothing: the artifact host keeps its own read-only entry, app. is not listed
+# neighbours ride nothing: both artifact hosts keep their own read-only entries, app. is not listed
 check("ci/app_subdomain",    gh("/pipelines/github/votingworks/vxsuite/1/workflows/x", "GET", host="app.circleci.com"), "deny")
-check("ci/tasks_s3_denied",  gh("/storage/artifacts/x/y/0/z.png", "GET", host="circleci-tasks-prod.s3.us-east-1.amazonaws.com"), "deny")
 
 # the credential guarantee, both directions: the CircleCI token is a CircleCI-only secret, and
 # the GitHub PAT must never appear on circleci.com either
@@ -596,6 +595,18 @@ check("ci/token_not_on_open",   "circle-token" in hdrs("/x", "POST", "api.getmos
 # ---- the three read-only hosts added 2026-08-05 ----
 check("ro/circle_artifact",    gh("/output/job/abc/artifacts/0/moon-task-logs/test/stderr.log", "GET", host="output.circle-artifacts.com"), "allow")
 check("ro/circle_art_post",    gh("/output/job/abc", "POST", host="output.circle-artifacts.com"), "deny")
+# ...and the presigned-S3 artifact bucket added 2026-09-10 (NOTES 51), read-only the same way
+check("ro/circle_tasks_s3",    gh("/storage/artifacts/uuid/uuid/0/apps/mark-scan/test-results/server-output.log?X-Amz-Signature=abc", "GET", host="circleci-tasks-prod.s3.us-east-1.amazonaws.com"), "allow")
+check("ro/circle_tasks_head",  gh("/storage/artifacts/uuid/uuid/0/x.png", "HEAD", host="circleci-tasks-prod.s3.us-east-1.amazonaws.com"), "allow")
+check("ro/circle_tasks_put",   gh("/storage/artifacts/uuid/uuid/0/x.png", "PUT", host="circleci-tasks-prod.s3.us-east-1.amazonaws.com"), "deny")
+check("ro/circle_tasks_post",  gh("/storage/artifacts/uuid/uuid/0/x.png", "POST", host="circleci-tasks-prod.s3.us-east-1.amazonaws.com"), "deny")
+check("ro/circle_tasks_del",   gh("/storage/artifacts/uuid/uuid/0/x.png", "DELETE", host="circleci-tasks-prod.s3.us-east-1.amazonaws.com"), "deny")
+# exact host: the sibling staging bucket and the region-bare form ride nothing
+check("ro/circle_tasks_stg",   gh("/storage/artifacts/x", "GET", host="circleci-tasks-staging.s3.us-east-1.amazonaws.com"), "deny")
+check("ro/circle_tasks_bare",  gh("/storage/artifacts/x", "GET", host="circleci-tasks-prod.s3.amazonaws.com"), "deny")
+# no credential is added on the way out -- neither secret belongs on an S3 bucket
+check("ro/circle_tasks_nocred", "authorization" in hdrs("/storage/artifacts/x", "GET", "circleci-tasks-prod.s3.us-east-1.amazonaws.com"), False)
+check("ro/circle_tasks_notok",  "circle-token" in hdrs("/storage/artifacts/x", "GET", "circleci-tasks-prod.s3.us-east-1.amazonaws.com"), False)
 check("ro/rustup_manifest",    gh("/rustup/release-stable.toml", "GET", host="static.rust-lang.org"), "allow")
 check("ro/rustup_post",        gh("/dist/x", "POST", host="static.rust-lang.org"), "deny")
 check("ro/vxdesign_presigned", gh("/nh-qa/uuid/election-package.zip?X-Amz-Signature=abc", "GET", host="vxdesign-staging.s3.us-west-1.amazonaws.com"), "allow")

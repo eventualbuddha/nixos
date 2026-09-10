@@ -700,6 +700,13 @@ READ_ONLY_HOSTS = {"api.mason-registry.dev", "downloads.claude.ai", "herdr.dev",
                    # handler (section 3a) because one endpoint on it takes a credential. Its
                    # reads are unchanged: GET/HEAD, no creds, exactly as this tier would give.
                    "output.circle-artifacts.com",   # circleci build artifacts: task logs, snapshot diffs
+                   # The SECOND artifact host: circleci also serves artifacts as presigned S3
+                   # URLs on this bucket, on a /storage/artifacts/ path, so opening the frontend
+                   # above did not cover them and the payload still 403'd. Same redirect-target
+                   # gap as item 30 itself. GET-only, like the design bucket below — the URL
+                   # carries its own AWS SigV4 signature and a 60s expiry, which we neither add
+                   # nor need (NOTES 51).
+                   "circleci-tasks-prod.s3.us-east-1.amazonaws.com",
                    "static.rust-lang.org",          # rustup channel manifests + toolchain downloads
                    # presigned election-package downloads for the design app (GET-only; the
                    # presigned URL carries its own AWS signature, which we neither add nor need):
