@@ -67,9 +67,29 @@ let
   # which is why the set below sticks to punctuation keys. Alt+<letter> is left
   # alone on purpose (GTK menu mnemonics live there), so macOS's Option+G/R/2
   # for (c)/(R)/(TM) are deliberately not bound.
+  #
+  # The `-p VoidSymbol` is load-bearing, not decoration. wtype uploads its own
+  # throwaway keymap and assigns the first keysym it needs to xkb keycode 9 --
+  # which is evdev KEY_ESC. Chromium derives a key event's `keyCode` from the
+  # physical code whenever the character has no ASCII equivalent, so a bare
+  # `wtype "—"` arrives in Blink as `key: "—", keyCode: 27`; Escape in a focused
+  # text field clears it and blurs. (ASCII chars are unaffected -- `wtype a`
+  # gets VKEY_A from the character -- which is why mod-copy/mod-paste below are
+  # fine, and why this only ever showed up on the typography binds. Firefox and
+  # GTK apps take keyCode from the keysym and never saw the bug.) `-p` claims
+  # that poisoned keycode 9 for VoidSymbol and sends only a *release* for it,
+  # so nothing observes an Escape press, and the real character lands on
+  # keycode 10 (Digit1 -> VKEY_1, harmless).
+  #
+  # This holds because every bind here types exactly one character. Longer
+  # strings would walk further up the keycode range into Enter (28), Tab (15)
+  # and Backspace (14), which no prefix can fix -- that would need real
+  # xkb-level symbols via niri's `input.keyboard.xkb.file`.
   typeChar = char: {
     action.spawn = [
       "wtype"
+      "-p"
+      "VoidSymbol"
       char
     ];
   };
