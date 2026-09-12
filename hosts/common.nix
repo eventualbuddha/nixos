@@ -111,6 +111,14 @@
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
   networking.firewall.allowedUDPPorts = [ config.services.tailscale.port ];
 
+  # MagicDNS answers tailnet names and forwards the rest to the system base
+  # config, which under DHCP is the router -- whose resolver answers in ~1s
+  # against 23ms here. IPv4 only: neither machine has an IPv6 default route.
+  networking.nameservers = [
+    "1.1.1.1"
+    "1.0.0.1"
+  ];
+
   # Keep DNS out of nsncd's worker pool. On NixOS every glibc NSS lookup --
   # user, group, AND hostname -- funnels through the nscd socket to nsncd,
   # which serves them all from 8 worker threads with a 10s handoff timeout.
