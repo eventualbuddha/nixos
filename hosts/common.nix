@@ -119,6 +119,12 @@
     "1.0.0.1"
   ];
 
+  # Those nameservers reach tailscaled only once network-local-commands has
+  # registered them with resolvconf, and nothing otherwise orders the two:
+  # tailscaled waits on NetworkManager-wait-online, which is not itself
+  # ordered after network.target.
+  systemd.services.tailscaled.after = [ "network-local-commands.service" ];
+
   # Keep DNS out of nsncd's worker pool. On NixOS every glibc NSS lookup --
   # user, group, AND hostname -- funnels through the nscd socket to nsncd,
   # which serves them all from 8 worker threads with a 10s handoff timeout.
