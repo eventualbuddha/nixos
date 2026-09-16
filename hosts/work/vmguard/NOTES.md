@@ -1128,7 +1128,9 @@ needs doing, and how to back everything out.
     v1.1 `…/{build}/retry`, `app.circleci.com` (the SPA; the workflow uuid is already readable
     from the GitHub check-run URL), and `circleci-tasks-prod.s3.us-east-1.amazonaws.com`, which
     shows up in the log serving snapshot diffs and is a separate question from this one.
-    (That last one was asked and answered separately — **opened read-only in item 51**.)
+    (That last one was asked and answered separately — **opened read-only in item 51**; and
+    `app.circleci.com` is now **read-only in item 52** — reads only, still no rerun, still no
+    token.)
 
     - Tests now 440 cases (+61): the read tier unchanged and uncredentialed; every allowed rerun
       shape; the org gate against votingworks/eventualbuddha/torvalds and all four malformed
@@ -1508,6 +1510,41 @@ needs doing, and how to back everything out.
       PUT/POST/DELETE denied, the staging and region-bare neighbours denied, and the two
       no-credential assertions. The old `ci/tasks_s3_denied` pin from item 43 is **removed** —
       it asserted exactly the behaviour this item reverses, so leaving it would have failed.
+    - Deploy: `./apply.sh` on `work`. Host-side only; nothing changes in the guest.
+
+52. **`app.circleci.com` opened read-only (2026-09-14, on request).** The ask was one URL —
+    `https://app.circleci.com/api/v2/insights/github/votingworks/vxsuite/flaky-tests`, the
+    flaky-test summary for vxsuite — and the answer is a plain `READ_ONLY_HOSTS` line for the
+    host, the same tier the two artifact hosts sit in.
+
+    **This reverses item 43's `ci/app_subdomain` pin, and the reasoning it rested on has not
+    changed so much as run out.** That pin said "app. is not listed", and was right for what it
+    covered: item 43 was adding a *credentialed write*, and letting the SPA host ride along on
+    that handler would have put the rerun POST and the `CIRCLE_TOKEN` behind a second hostname
+    nobody had reviewed. That is still true and still enforced — `app.circleci.com` gets the
+    read tier, never `_handle_circleci`, so the rerun POST on it is denied and no token is
+    injected (three tests pin this). What the pin did *not* decide is whether plain reads
+    belong, which is what was asked here, and is a much smaller question.
+
+    **It grants no reach the gate did not already have.** `circleci.com`'s own GET/HEAD are
+    already allowed uncredentialed (section 3a), and `app.circleci.com` fronts the same
+    `/api/v2/…` surface — the insights endpoints answer on both. So this is not a new capability
+    but the same one at the hostname the UI hands you: the alternative was the guest rewriting
+    every URL it copies out of a CircleCI page, which is a rule that gets quietly wrong rather
+    than enforced.
+
+    **Host-level, not path-level, deliberately.** A gate on `/api/v2/insights/` alone would look
+    tighter and buy nothing, because every path it excluded is readable on `circleci.com`
+    already; it would only add a second place to edit each time a read moves. The tier's own
+    bound is the real one: GET/HEAD only, no credential, writes denied.
+
+    - Public project, so the read answers unauthenticated — same footing as the other CircleCI
+      reads. A private project would 404 it, which is a deny by another name.
+    - Tests now 552 cases (+8 net): the flaky-tests read and its HEAD allowed, an SPA page read
+      allowed, POST/PUT/DELETE denied, `ui.circleci.com` and `x.app.circleci.com` denied (exact
+      host, as always), and no headers injected. `ci/app_subdomain` is **replaced** by
+      `ci/app_rerun_post`, which pins the part of item 43's intent that still holds: the rerun
+      write does not reach this host.
     - Deploy: `./apply.sh` on `work`. Host-side only; nothing changes in the guest.
 
 ## Running it: `Justfile` (RETIRED)

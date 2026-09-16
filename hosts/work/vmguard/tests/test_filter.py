@@ -582,8 +582,9 @@ check("ci/rerun_traversal",  circle(f"/api/v2/workflow/{WF}/../../x/rerun", "POS
 check("ci/rerun_put",        circle(RERUN, "PUT"), "deny")
 check("ci/rerun_delete",     circle(RERUN, "DELETE"), "deny")
 check("ci/rerun_patch",      circle(RERUN, "PATCH"), "deny")
-# neighbours ride nothing: both artifact hosts keep their own read-only entries, app. is not listed
-check("ci/app_subdomain",    gh("/pipelines/github/votingworks/vxsuite/1/workflows/x", "GET", host="app.circleci.com"), "deny")
+# neighbours ride nothing off this handler: both artifact hosts and app. keep their own
+# read-only entries, and none of them reaches the rerun write or the token (below, NOTES 52)
+check("ci/app_rerun_post",   gh(f"/api/v2/workflow/{WF}/rerun", "POST", host="app.circleci.com"), "deny")
 
 # the credential guarantee, both directions: the CircleCI token is a CircleCI-only secret, and
 # the GitHub PAT must never appear on circleci.com either
@@ -607,6 +608,20 @@ check("ro/circle_tasks_bare",  gh("/storage/artifacts/x", "GET", host="circleci-
 # no credential is added on the way out -- neither secret belongs on an S3 bucket
 check("ro/circle_tasks_nocred", "authorization" in hdrs("/storage/artifacts/x", "GET", "circleci-tasks-prod.s3.us-east-1.amazonaws.com"), False)
 check("ro/circle_tasks_notok",  "circle-token" in hdrs("/storage/artifacts/x", "GET", "circleci-tasks-prod.s3.us-east-1.amazonaws.com"), False)
+# ...and the SPA/API front app.circleci.com added 2026-09-14 (NOTES 52), read-only the same way:
+# the insights read that was asked for, plus the SPA pages that host also serves
+check("ro/circle_app_flaky",   gh("/api/v2/insights/github/votingworks/vxsuite/flaky-tests", "GET", host="app.circleci.com"), "allow")
+check("ro/circle_app_head",    gh("/api/v2/insights/github/votingworks/vxsuite/flaky-tests", "HEAD", host="app.circleci.com"), "allow")
+check("ro/circle_app_spa",     gh("/pipelines/github/votingworks/vxsuite/1/workflows/x", "GET", host="app.circleci.com"), "allow")
+check("ro/circle_app_post",    gh("/api/v2/insights/github/votingworks/vxsuite/flaky-tests", "POST", host="app.circleci.com"), "deny")
+check("ro/circle_app_put",     gh("/api/v2/project/gh/votingworks/vxsuite/envvar", "PUT", host="app.circleci.com"), "deny")
+check("ro/circle_app_del",     gh("/api/v2/project/gh/votingworks/vxsuite/envvar/X", "DELETE", host="app.circleci.com"), "deny")
+# exact host, as always: the neighbouring fronts are not listed
+check("ro/circle_app_ui",      gh("/api/v2/me", "GET", host="ui.circleci.com"), "deny")
+check("ro/circle_app_sub",     gh("/api/v2/me", "GET", host="x.app.circleci.com"), "deny")
+# no credential on the way out: the read tier injects nothing, and the CircleCI token in
+# particular stays on circleci.com's own handler, where the org check lives
+check("ro/circle_app_nocred",  hdrs("/api/v2/insights/github/votingworks/vxsuite/flaky-tests", "GET", "app.circleci.com"), {})
 check("ro/rustup_manifest",    gh("/rustup/release-stable.toml", "GET", host="static.rust-lang.org"), "allow")
 check("ro/rustup_post",        gh("/dist/x", "POST", host="static.rust-lang.org"), "deny")
 check("ro/vxdesign_presigned", gh("/nh-qa/uuid/election-package.zip?X-Amz-Signature=abc", "GET", host="vxdesign-staging.s3.us-west-1.amazonaws.com"), "allow")

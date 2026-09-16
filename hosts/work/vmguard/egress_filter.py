@@ -707,6 +707,14 @@ READ_ONLY_HOSTS = {"api.mason-registry.dev", "downloads.claude.ai", "herdr.dev",
                    # carries its own AWS SigV4 signature and a 60s expiry, which we neither add
                    # nor need (NOTES 51).
                    "circleci-tasks-prod.s3.us-east-1.amazonaws.com",
+                   # The SPA host, which also fronts the same `/api/v2/…` surface as circleci.com
+                   # — the insights endpoints (flaky-tests, job timing) are what this was asked
+                   # for. Read-only and uncredentialed, which is exactly the tier circleci.com's
+                   # own GET/HEAD already sits in, so this adds no reach the gate did not already
+                   # give; it saves the guest rewriting the host it was handed. The credentialed
+                   # rerun POST stays on circleci.com and its own handler — nothing on this entry
+                   # can write, and no token is injected here (NOTES 52).
+                   "app.circleci.com",
                    "static.rust-lang.org",          # rustup channel manifests + toolchain downloads
                    # presigned election-package downloads for the design app (GET-only; the
                    # presigned URL carries its own AWS signature, which we neither add nor need):
