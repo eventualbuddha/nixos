@@ -94,6 +94,14 @@
   # "Unable to find a satisfying virtiofsd".
   virtualisation.libvirtd.qemu.vhostUserPackages = [ pkgs.virtiofsd ];
 
+  # Shared container config (/etc/containers/{policy.json,registries.conf,...}).
+  # podman is a home-manager package from home/toolchains.nix, which installs
+  # the binary but nothing system-level -- and containers/image refuses to run
+  # without a signature policy, so `podman run` dies with "no policy.json file
+  # found at any of the following". Every NixOS host here imports ../home and
+  # therefore has podman, so this belongs in common rather than per-host.
+  virtualisation.containers.enable = true;
+
   # Tailscale. `trustedInterfaces` skips the firewall for anything already
   # on the tailnet; the UDP port is opened so peers can connect directly
   # instead of relaying through a DERP server. Authenticating this machine

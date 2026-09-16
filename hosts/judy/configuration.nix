@@ -113,6 +113,4 @@
   home-manager.users.brian.programs.starship.settings = fromTOML (
     builtins.readFile ../../home/core/starship-gruvbox-rainbow.toml
   );
-
-  virtualisation.containers.enable = true;
 }
