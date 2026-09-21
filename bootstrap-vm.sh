@@ -342,5 +342,5 @@ printf '\n'
 say "Open a new login shell to land in it. Then, still to do by hand:"
 say "  1. claude /login          -- the guest holds its own subscription token"
 say "  2. move this guest's NIC onto the vmguard network, on work, if it is still on NAT"
-say "  3. clone vxsuite into ~/code/vxsuite; \`wt\` and 10-vendor-tools.fish assume it"
+say "  3. clone vxsuite into ~/code/vxsuite; \`proj\` and 10-vendor-tools.fish assume it"
 printf '\n'
