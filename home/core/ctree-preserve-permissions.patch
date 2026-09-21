@@ -1,0 +1,29 @@
+diff --git a/crates/clonetree/src/lib.rs b/crates/clonetree/src/lib.rs
+index 01c9524..f618587 100644
+--- a/crates/clonetree/src/lib.rs
++++ b/crates/clonetree/src/lib.rs
+@@ -469,6 +469,24 @@ fn clone_tree_full_traversal<P: AsRef<Path>, Q: AsRef<Path>>(
+                 dest: dest_path.clone(),
+                 source,
+             })?;
++
++            // reflink_or_copy does not carry the source mode across, so
++            // without this every cloned file lands with the process umask
++            // applied: executables lose +x and read-only files become
++            // writable. The crate has a test asserting otherwise
++            // (file_permissions_are_preserved) which fails upstream.
++            let perms = fs::metadata(path)
++                .map_err(|source| Error::Copy {
++                    src: path.to_path_buf(),
++                    dest: dest_path.clone(),
++                    source,
++                })?
++                .permissions();
++            fs::set_permissions(&dest_path, perms).map_err(|source| Error::Copy {
++                src: path.to_path_buf(),
++                dest: dest_path.clone(),
++                source,
++            })?;
+         } else if entry.file_type().is_some_and(|ft| ft.is_dir()) {
+             // Create directories explicitly to preserve empty directories
+             if !created_dirs.contains(&dest_path) {
