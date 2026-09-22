@@ -1547,6 +1547,27 @@ needs doing, and how to back everything out.
       write does not reach this host.
     - Deploy: `./apply.sh` on `work`. Host-side only; nothing changes in the guest.
 
+53. **Turborepo's version-pinned schema hosts opened read-only (2026-09-22, on request).** The
+    ask was "`*.turborepo.dev`, unless it's just analytics". The deny log had six records, all
+    the same read on three hosts: `GET`/`HEAD /schema.json` on `v2-11-2`, `v2-11-1` and
+    `v2-10-5.turborepo.dev` — a `turbo.json` `"$schema"` pinned to a release rather than the
+    bare `turborepo.dev/schema.json` item 40 opened. Not analytics: turbo's telemetry goes to
+    `telemetry.vercel.com` (item 50), which this does not touch.
+
+    **A pattern, not a wildcard, and not a list.** One host per turbo release means an exact list
+    would 403 again on every upgrade, so this adds the file's first host *pattern*:
+    `READ_ONLY_HOST_PATTERNS`, full-matched, same GET/HEAD/no-creds policy as `READ_ONLY_HOSTS`.
+    Its one entry is `v\d+-\d+-\d+\.turborepo\.dev` — the release shape only. A bare
+    `*.turborepo.dev` was not taken: it would also admit any collector or upload host Vercel puts
+    under that domain later, and read-only would not stop a GET from carrying data out in its URL.
+
+    - The tier-overlap and POST-exception asserts are over the exact sets and are unchanged; a
+      pattern host cannot take a POST exception, which is fine since none is needed.
+    - Tests now 560 cases (+7): a versioned GET and HEAD allowed, POST denied, no headers
+      injected, and `telemetry.turborepo.dev`, a nested `a.v2-11-2.…` and a
+      `v2-11-2.turborepo.dev.evil.com` suffix all denied.
+    - Deploy: `./apply.sh` on `work`. Host-side only.
+
 ## Running it: `Justfile` (RETIRED)
 
 > **THE JUSTFILE IS GONE, DELETED IN THE NIXOS PORT (2026-08-28).** This section, and the two

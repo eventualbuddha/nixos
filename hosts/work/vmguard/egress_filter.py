@@ -894,6 +894,19 @@ READ_ONLY_HOSTS = {"api.mason-registry.dev", "downloads.claude.ai", "herdr.dev",
                    "vitest.dev", "support.circleci.com",
                    }
 
+# The read-only hosts that cannot be listed exactly, as full-match patterns: same policy as
+# READ_ONLY_HOSTS (GET/HEAD, no creds). Each admits one shape of name, never a bare
+# "*.domain" — a wildcard would also admit whatever telemetry or upload host the vendor puts
+# under that domain next.
+READ_ONLY_HOST_PATTERNS = (
+    # Turborepo's version-pinned schema mirrors, one host per release: a turbo.json "$schema"
+    # of https://v2-11-2.turborepo.dev/schema.json (NOTES 53).
+    re.compile(r"v\d+-\d+-\d+\.turborepo\.dev"),
+)
+
+def _is_read_only_host(host):
+    return host in READ_ONLY_HOSTS or any(p.fullmatch(host) for p in READ_ONLY_HOST_PATTERNS)
+
 # Exact POST paths permitted on a READ_ONLY_HOSTS host, as {host: {paths}}. Everything else on
 # these hosts keeps the plain GET/HEAD policy, and no credentials are injected either way.
 #
@@ -1280,7 +1293,7 @@ class EgressFilter:
             return handler(flow)
         if host in OPEN_HOSTS:
             return _handle_open(flow)
-        if host in READ_ONLY_HOSTS:
+        if _is_read_only_host(host):
             return _handle_read_only(flow)
         return _deny(flow, "host not on allowlist")
 

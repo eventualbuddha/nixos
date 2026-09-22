@@ -737,6 +737,14 @@ check("ro/turborepo_post",   gh("/schema.json", "POST", host="turborepo.dev"), "
 # the current domain was already open; the telemetry endpoint is neither and stays denied
 check("ro/turbo_build",      gh("/schema.json", "GET", host="turbo.build"), "allow")
 check("ro/turbo_telemetry",  gh("/api/turborepo/v1/events", "POST", host="telemetry.vercel.com"), "deny")
+# version-pinned schema mirrors (NOTES 53): a pattern, read-only, and only the vX-Y-Z shape
+check("ro/turborepo_ver",      gh("/schema.json", "GET", host="v2-11-2.turborepo.dev"), "allow")
+check("ro/turborepo_ver_head", gh("/schema.json", "HEAD", host="v2-10-5.turborepo.dev"), "allow")
+check("ro/turborepo_ver_post", gh("/schema.json", "POST", host="v2-11-2.turborepo.dev"), "deny")
+check("ro/turborepo_ver_creds", hdrs("/schema.json", "GET", "v2-11-2.turborepo.dev"), {})
+check("ro/turborepo_other_sub", gh("/x", "GET", host="telemetry.turborepo.dev"), "deny")
+check("ro/turborepo_ver_nest",  gh("/x", "GET", host="a.v2-11-2.turborepo.dev"), "deny")
+check("ro/turborepo_ver_suffix", gh("/x", "GET", host="v2-11-2.turborepo.dev.evil.com"), "deny")
 
 # ---- PyPI + uv (NOTES 37): index host and payload host both needed ----
 check("py/simple_index",     gh("/simple/python-barcode/", "GET", host="pypi.org"), "allow")
