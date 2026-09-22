@@ -80,8 +80,9 @@ in
     tree-sitter
     tuicr # code review TUI
 
-    # Agent tooling. claude-code is deliberately absent -- see
-    # ./claude-code.nix for why it is bootstrapped rather than installed.
+    # Agent tooling. claude-code and codex are deliberately absent -- see
+    # ./claude-code.nix and ./codex.nix for why they are bootstrapped rather
+    # than installed.
     uv # python project/venv/interpreter management (pip/poetry/pyenv replacement)
     herdr
 

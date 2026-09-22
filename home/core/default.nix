@@ -15,6 +15,7 @@ _:
     ./cli.nix
     ./dev-tools.nix
     ./claude-code.nix
+    ./codex.nix
     ./editor.nix
     ./git.nix
   ];
