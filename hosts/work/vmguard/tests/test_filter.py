@@ -746,6 +746,20 @@ check("ro/turborepo_other_sub", gh("/x", "GET", host="telemetry.turborepo.dev"),
 check("ro/turborepo_ver_nest",  gh("/x", "GET", host="a.v2-11-2.turborepo.dev"), "deny")
 check("ro/turborepo_ver_suffix", gh("/x", "GET", host="v2-11-2.turborepo.dev.evil.com"), "deny")
 
+# ---- Codex (NOTES 54): releases.openai.com read-only; the OpenAI API hosts are tunnelled ----
+check("oa/releases_channel", gh("/codex/channels/latest", "GET", host="releases.openai.com"), "allow")
+check("oa/releases_asset",   gh("/codex/releases/0.156.0/codex-package-x86_64-unknown-linux-musl.tar.gz", "GET", host="releases.openai.com"), "allow")
+check("oa/releases_post",    gh("/codex/channels/latest", "POST", host="releases.openai.com"), "deny")
+check("oa/releases_creds",   hdrs("/codex/channels/latest", "GET", "releases.openai.com"), {})
+# the tunnelled hosts are passed through by the unit's --ignore-hosts and never reach the addon;
+# if one ever does (a non-443 port), the addon fails closed rather than treating it as open
+check("oa/chatgpt_bumped",   gh("/backend-api/codex/responses", "POST", host="chatgpt.com"), "deny")
+check("oa/api_bumped",       gh("/v1/responses", "POST", host="api.openai.com"), "deny")
+check("oa/auth_bumped",      gh("/oauth/token", "POST", host="auth.openai.com"), "deny")
+# exact hosts: neither the ChatGPT telemetry subdomain nor the bare domain rides along
+check("oa/ab_denied",        gh("/v1/rgstr", "POST", host="ab.chatgpt.com"), "deny")
+check("oa/bare_denied",      gh("/x", "GET", host="openai.com"), "deny")
+
 # ---- PyPI + uv (NOTES 37): index host and payload host both needed ----
 check("py/simple_index",     gh("/simple/python-barcode/", "GET", host="pypi.org"), "allow")
 check("py/json_api",         gh("/pypi/pillow/json", "GET", host="pypi.org"), "allow")

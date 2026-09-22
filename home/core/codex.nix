@@ -41,10 +41,9 @@ in
   # I/O, and `|| true` because activation aborts at its first failing step (see
   # installLazyVim in home/core/editor.nix).
   #
-  # On the vxsuite build VM this is currently a no-op: vmguard's egress filter
-  # does not allowlist chatgpt.com (the installer), releases.openai.com (the
-  # binaries), or any OpenAI inference host, so codex would not work there
-  # even if installed.
+  # On the vxsuite build VM this depends on vmguard: it tunnels chatgpt.com
+  # (the installer, and inference), auth.openai.com and api.openai.com, and
+  # allows downloads from releases.openai.com (vmguard NOTES 54).
   home.activation.bootstrapCodex = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     if [ ! -e "${binDir}/codex" ]; then
       run ${pkgs.curl}/bin/curl -fsSL --create-dirs -o "$HOME/.cache/codex-install.sh" \

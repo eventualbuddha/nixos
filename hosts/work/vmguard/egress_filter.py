@@ -12,8 +12,9 @@
 # credential-free and read-only, apart from a short list of exact-path POST exceptions
 # (LAUNCHPAD_PATHS, READ_ONLY_POST_PATHS) whose bodies leave the guest uninspected — each is
 # commented where it is defined. Anything not named here is denied and logged.
-# api.anthropic.com / platform.claude.com never reach this file at all — the systemd unit
-# tunnels them with --ignore-hosts, so they're never TLS-bumped.
+# api.anthropic.com / platform.claude.com, and Codex's chatgpt.com / auth.openai.com /
+# api.openai.com, never reach this file at all — the systemd unit tunnels them with
+# --ignore-hosts, so they're never TLS-bumped.
 #
 # ONE EXCEPTION to the above, added deliberately: OPEN_HOSTS take any method with any body and
 # are therefore an unrestricted way OUT. See that definition before adding to it.
@@ -880,6 +881,12 @@ READ_ONLY_HOSTS = {"api.mason-registry.dev", "downloads.claude.ai", "herdr.dev",
                    # this admits the entry point to a chain whose payload was already allowed —
                    # it is not new reach.
                    "claude.ai",
+                   #
+                   # Codex's release channel and binaries (NOTES 54): `GET /codex/channels/latest`
+                   # and `/codex/releases/{ver}/*`, served from this host with no redirect. The
+                   # installer and Codex's own updater both read it. Only the download host is
+                   # here; the hosts Codex talks to once installed are tunnelled by the unit.
+                   "releases.openai.com",
                    #
                    # moshi's image/link CDN (`GET /NZr521Lx`, a short-code path). The narrow
                    # counterpart to api.getmoshi.app in OPEN_HOSTS: this one is content served

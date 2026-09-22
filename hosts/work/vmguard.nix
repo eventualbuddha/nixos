@@ -101,6 +101,13 @@ in
         # reaches the addon.
         "--ignore-hosts '^api\\.anthropic\\.com:443$'"
         "--ignore-hosts '^platform\\.claude\\.com:443$'"
+        # The same bargain for Codex (NOTES 54): chatgpt.com carries inference
+        # for a ChatGPT sign-in (and serves the installer), api.openai.com for
+        # an API key, and auth.openai.com the login and token refresh. Exact
+        # hosts, so ab.chatgpt.com and the rest of openai.com stay filtered.
+        "--ignore-hosts '^chatgpt\\.com:443$'"
+        "--ignore-hosts '^auth\\.openai\\.com:443$'"
+        "--ignore-hosts '^api\\.openai\\.com:443$'"
         "--listen-host ${listenHost}"
         "--listen-port ${toString listenPort}"
         "-s ${addon}/egress_filter.py"

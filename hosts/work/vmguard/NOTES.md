@@ -1568,6 +1568,37 @@ needs doing, and how to back everything out.
       `v2-11-2.turborepo.dev.evil.com` suffix all denied.
     - Deploy: `./apply.sh` on `work`. Host-side only.
 
+54. **Codex: OpenAI's API hosts tunnelled, its release host read-only (2026-09-22, on
+    request).** `home/core/codex.nix` bootstraps Codex into `~/.local/bin` on every machine,
+    and on the guest it silently did nothing: `chatgpt.com/codex/install.sh` and
+    `releases.openai.com` both 403'd (only the installer's GitHub fallback,
+    `api.github.com`, was reachable). Getting the binary on was never the real question,
+    though. Codex is useless without its API, so the ask was taken as "full Codex on vx".
+
+    **This is a second api.anthropic.com, knowingly.** Codex's traffic is prompts and code
+    going out, so the read-only tier cannot express it. It gets what Claude Code got in
+    deviation 4: `--ignore-hosts` in the unit, tunnelled rather than bumped, never seen by the
+    addon. The guest's OpenAI login lives in the guest (`~/.codex/auth.json`), same as the
+    Anthropic subscription token, and the host never sees it. The cost is the same too: an
+    uninspected channel from an assumed-compromised guest to a third party, now to two
+    third parties.
+    - Tunnelled: `chatgpt.com` (inference for a ChatGPT sign-in, at `/backend-api/codex/…`),
+      `auth.openai.com` (login and token refresh; use `codex login --device-auth`, since the
+      guest has no browser for the localhost callback), `api.openai.com` (inference for an API
+      key). The installer also lives on `chatgpt.com`, so tunnelling that host covers it. A
+      path-scoped read-only rule for `/codex/install.sh` would have been dead code.
+    - Read-only (`READ_ONLY_HOSTS`): `releases.openai.com`, which serves the channel manifest
+      and every asset straight from that host, with no redirect (checked from the host). The
+      updater reads it too.
+    - **Left filtered:** every other OpenAI name. The `--ignore-hosts` patterns are exact, so
+      `ab.chatgpt.com` (telemetry) and bare `openai.com` still hit the addon and 403. Widen
+      from the deny log if Codex turns out to need more.
+    - Tests +9: the release host's GET allowed, POST denied, no headers injected; the three
+      tunnelled hosts denied if one ever reaches the addon; `ab.chatgpt.com` and `openai.com`
+      denied.
+    - Deploy: `./apply.sh` on `work` (unit and addon), then `./apply.sh` on vx to run the
+      bootstrap.
+
 ## Running it: `Justfile` (RETIRED)
 
 > **THE JUSTFILE IS GONE, DELETED IN THE NIXOS PORT (2026-08-28).** This section, and the two
