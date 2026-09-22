@@ -62,6 +62,7 @@ in
     duf # nicer `df`, pairs with dust
     procs # nicer `ps`
     jq # JSON processor
+    bubblewrap # process sandboxing (bwrap)
 
     # Offline batch dedupe for btrfs, which every machine here runs. Worth
     # having around because reflink-aware tooling only makes *new* copies
