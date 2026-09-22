@@ -65,8 +65,19 @@ if [[ ! -e /etc/NIXOS ]]; then
     HM=(nix run home-manager/master --)
   fi
 
+  # Build proj from the local checkout when there is one, uncommitted edits
+  # included; `git+file` rather than `path` so its ignored target/ stays out.
+  OVERRIDES=()
+  PROJ_SRC="${PROJ_SRC:-${HOME}/code/proj}"
+  if [[ -d "${PROJ_SRC}/.git" ]]; then
+    OVERRIDES+=(--override-input proj "git+file://${PROJ_SRC}")
+  fi
+
   echo "Activating the new home-manager generation (${ATTR})..." | tee "${LOG}"
-  "${HM[@]}" switch --flake ".#${ATTR}" 2>&1 | tee -a "${LOG}"
+  if [[ ${#OVERRIDES[@]} -gt 0 ]]; then
+    echo "Using proj from ${PROJ_SRC}" | tee -a "${LOG}"
+  fi
+  "${HM[@]}" switch --flake ".#${ATTR}" "${OVERRIDES[@]}" 2>&1 | tee -a "${LOG}"
   echo "Done. Active generation: $(readlink ~/.local/state/nix/profiles/home-manager)" \
     | tee -a "${LOG}"
   exit 0
