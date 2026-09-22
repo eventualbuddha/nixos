@@ -235,19 +235,29 @@ step "Teach nix-daemon about the proxy"
 #
 # This VM has had this file since its own setup, hand-written and recorded
 # nowhere in this repo. That is exactly why it is here.
+#
+# NIX_SSL_CERT_FILE is here for the same reason and is easy to miss: vmguard
+# terminates TLS, so anything that does not trust its CA sees a verification
+# failure. The variable is in the default `impureEnvVars`, so the daemon's
+# value reaches fixed-output builders, where nixpkgs' `certifi` reads it -- and
+# without it those builders fall back to the bundled `nss-cacert`, which has no
+# vmguard CA. That is what breaks `fetchCargoVendor` and friends with
+# CERTIFICATE_VERIFY_FAILED while nix's own downloads keep working.
 DROPIN_DIR=/etc/systemd/system/nix-daemon.service.d
 DROPIN="$DROPIN_DIR/override.conf"
+CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 
 if [ -z "$PROXIED" ]; then
   say "no proxy in use -- nix-daemon needs no drop-in"
   # Deliberately not removing an existing one: a guest bootstrapped before
   # `move-nic` has no proxy *yet* and will need the drop-in the moment it moves.
-elif [ -r "$DROPIN" ] && grep -qF "$PROXIED" "$DROPIN" 2>/dev/null; then
+elif [ -r "$DROPIN" ] && grep -qF "$PROXIED" "$DROPIN" 2>/dev/null \
+  && grep -qF "NIX_SSL_CERT_FILE=$CA_BUNDLE" "$DROPIN" 2>/dev/null; then
   skip "$DROPIN already points at $PROXIED"
 else
   say "writing $DROPIN"
   if [ -n "$CHECK" ]; then
-    say "would write the proxy Environment= lines and restart nix-daemon"
+    say "would write the proxy and CA Environment= lines and restart nix-daemon"
   else
     sudo mkdir -p "$DROPIN_DIR"
     # Both cases: some tools read the lowercase names, some the uppercase, and
@@ -263,6 +273,7 @@ Environment=no_proxy=${no_proxy:-localhost,127.0.0.1,::1}
 Environment=HTTP_PROXY=$PROXIED
 Environment=HTTPS_PROXY=$PROXIED
 Environment=NO_PROXY=${NO_PROXY:-localhost,127.0.0.1,::1}
+Environment=NIX_SSL_CERT_FILE=$CA_BUNDLE
 EOF
     sudo systemctl daemon-reload
     sudo systemctl restart nix-daemon
