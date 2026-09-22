@@ -62,6 +62,11 @@
   # kernel somewhere to page under pressure without needing a swap partition.
   zramSwap.enable = true;
 
+  # judy's touchpad scrolls too far per swipe. niri's scroll-factor scales the
+  # distance of finger-sourced scroll events only, so apps still see a finger
+  # source and keep their kinetic (inertial) scrolling.
+  home-manager.users.brian.programs.niri.settings.input.touchpad.scroll-factor = 0.2;
+
   # bambu-studio (wxGTK3) crashes on startup under niri's native Wayland: an
   # early wx log-flush pops a message-box dialog whose underlying GTK window
   # fails to realize, leaving a NULL widget that crashes wx's cleanup path.
