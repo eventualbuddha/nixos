@@ -18,16 +18,16 @@
 # power-cycle with none of that, and it is reversible: the old /home stays on
 # vda1 until you delete it by hand.
 #
-# WHY BTRFS ON IT. `ctree` -- the CLI from the clonetree crate, packaged in
-# home/core/cli.nix -- copies a directory tree by reflinking rather than
-# copying. That needs a CoW filesystem, and reflink requires source and
-# destination on the *same* filesystem. `proj` clones from ~/code/vxsuite into
-# ~/projects/<project>/<workstream>, so both have to live on the new volume --
-# which mounting the whole of /home gets for free. Nothing in vxsuite requires
-# ext4: every `ext4` reference in the tree is about formatting and mounting USB
-# drives (libs/usb-drive), which is the sdb passthrough and is unaffected. The
-# one place that cares about the filesystem under it, libs/fs/src/syscalls.ts,
-# lists btrfs as supporting the renameat2 flags it needs.
+# WHY BTRFS ON IT. `proj` makes worktrees with `cp --reflink=always`, which
+# shares extents rather than copying them. That needs a CoW filesystem, and
+# reflink requires source and destination on the *same* filesystem. `proj`
+# clones from ~/code/vxsuite into ~/projects/<project>/<workstream>, so both
+# have to live on the new volume -- which mounting the whole of /home gets for
+# free. Nothing in vxsuite requires ext4: every `ext4` reference in the tree is
+# about formatting and mounting USB drives (libs/usb-drive), which is the sdb
+# passthrough and is unaffected. The one place that cares about the filesystem
+# under it, libs/fs/src/syscalls.ts, lists btrfs as supporting the renameat2
+# flags it needs.
 set -euo pipefail
 
 DOMAIN="${DOMAIN:-vxsuite}"

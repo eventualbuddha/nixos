@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Move the vxsuite guest's /home onto a btrfs volume, so that `ctree` can
+# Move the vxsuite guest's /home onto a btrfs volume, so that `proj` can
 # make worktrees by reflinking instead of copying. Runs *in the guest*, as root.
 # The host side is `add-home-disk.sh` on `work`, which must have run first.
 #
@@ -29,7 +29,7 @@
 #     out at full size, so ~/projects is 69G before and 69G after. The saving
 #     is on worktrees created *from now on*: a reflinked clone of a ~3G
 #     workstream costs nearly nothing. To collect it on the trees that already
-#     exist, either re-create them with `ctree` once, or run `duperemove -dr
+#     exist, either re-create them with `proj` once, or run `duperemove -dr
 #     ~/projects` afterwards.
 #
 #   - It does not set `chattr +C` on anything. That is correct on the *host*
