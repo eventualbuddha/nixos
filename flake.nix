@@ -31,6 +31,13 @@
         home-manager.follows = "home-manager";
       };
     };
+
+    # The ~/projects worktree manager: binaries, fish function, completions and
+    # starship segment, all from its `homeModules.default`. vxdev only.
+    proj = {
+      url = "github:eventualbuddha/proj";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =

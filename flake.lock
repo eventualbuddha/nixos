@@ -160,6 +160,26 @@
         "type": "github"
       }
     },
+    "proj": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1789142936,
+        "narHash": "sha256-41wwbnYH6+RROFJijUZLI+ADGv7I1g074K+EB9lBPvs=",
+        "owner": "eventualbuddha",
+        "repo": "proj",
+        "rev": "987d95c4bcb4e592d48ad202434a7356fb6ca0a5",
+        "type": "github"
+      },
+      "original": {
+        "owner": "eventualbuddha",
+        "repo": "proj",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "home-manager": "home-manager",
@@ -167,6 +187,7 @@
         "niri": "niri",
         "nixpkgs": "nixpkgs_2",
         "noctalia": "noctalia",
+        "proj": "proj",
         "zen-browser": "zen-browser"
       }
     },

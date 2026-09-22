@@ -21,6 +21,7 @@
   pkgs,
   lib,
   config,
+  inputs,
   ...
 }:
 
@@ -33,6 +34,9 @@
     # vite-plus: vxdev only, because its managed node/pnpm runtimes are musl
     # builds that cannot exec on NixOS. See the header of that file.
     ../../home/vite-plus.nix
+    # proj -- the dashboard, the fish function that wraps it, the completions
+    # and the prompt segment. vxdev only.
+    inputs.proj.homeModules.default
   ];
 
   home = {
@@ -153,9 +157,44 @@
   # purple, so the vxsuite VM's terminals are distinguishable from judy's and
   # work's at a glance. See the header of the toml for where the colors come
   # from.
-  programs.starship.settings = fromTOML (
-    builtins.readFile ../../home/core/starship-tokyo-night-vx.toml
-  );
+  # The theme comes from the shared preset file; the project segment is spliced
+  # in here rather than edited into that file, so the invariant its header
+  # documents -- that a diff of the two tokyo-night files is exactly the theme --
+  # keeps holding. proj's own module defines `custom.proj`; where it goes in the
+  # prompt is this host's call, and only this host imports proj.
+  #
+  # It rides in the same purple block as $directory rather than getting a block
+  # of its own: no extra powerline separators, and it reads as one unit, which is
+  # what it is -- where you are, then where in it.
+  programs.starship.settings =
+    let
+      base = fromTOML (builtins.readFile ../../home/core/starship-tokyo-night-vx.toml);
+    in
+    base
+    // {
+      # Two edits to the preset's format, both here rather than in the theme
+      # file, so the invariant that file's header documents -- a diff of the two
+      # tokyo-night presets is exactly the theme -- keeps holding. judy and work
+      # share that preset and want the segments this drops.
+      format =
+        builtins.replaceStrings
+          [
+            "$directory"
+            # Language versions and the clock. On this VM the versions are a
+            # constant -- one repo, one toolchain, pinned by the flake -- so they
+            # are five segments that never say anything, and the clock is in the
+            # status bar already. Dropping them closes the powerline straight
+            # off the git segment. The separator is written literally rather
+            # than as an escape: Nix has no \uXXXX, so "\ue0b4" is the five
+            # characters u-e-0-b-4 and the pattern silently never matches.
+            "[](fg:#362c4b bg:#241e33)$nodejs$bun$rust$golang$php[](fg:#241e33 bg:#1f1a2b)$time[ ](fg:#1f1a2b)"
+          ]
+          [
+            "\${custom.proj}$directory"
+            "[ ](fg:#362c4b)"
+          ]
+          base.format;
+    };
 
   # Let home-manager own bash too, so this VM's shell environment comes from the
   # flake whichever shell is in use. fish has been fully declared for a while;
@@ -239,15 +278,11 @@
     "fish/conf.d/00-nix-profile-path.fish".source = ./fish/00-nix-profile-path.fish;
     "fish/conf.d/10-vendor-tools.fish".source = ./fish/10-vendor-tools.fish;
     "fish/conf.d/20-vmguard.fish".source = ./fish/20-vmguard.fish;
-
-    # `wt` manages the vxsuite worktrees under ~/code (see `wt help`). Only
-    # here, not in home/core: it hardcodes ~/code/vxsuite and is meaningless on
-    # a machine without that checkout. The completions call back into the
-    # function itself (`wt __targets` / `wt __branches`) so the two stay in
-    # sync, which is why they have to travel together.
-    "fish/functions/wt.fish".source = ./fish/wt.fish;
-    "fish/completions/wt.fish".source = ./fish/wt-completions.fish;
   };
+
+  # `proj` -- the function, its completions and the 30-proj-cargo.fish snippet
+  # -- comes from its own repo's home-manager module, imported at the top of
+  # this file.
 
   # Everything that was in ~/.gitconfig, which guest-setup.sh and hand-editing
   # built up over the life of this VM. home-manager writes ~/.config/git/config,
