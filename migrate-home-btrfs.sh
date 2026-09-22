@@ -100,7 +100,10 @@ if findmnt -n /home >/dev/null 2>&1; then
        what is there before running this."
 fi
 
-HOME_KB="$(du -sxk /home | awk '{print $1}')"
+# du exits 1 if a file vanishes mid-walk, which under pipefail would end the
+# script here with no message. The total is an estimate either way.
+HOME_KB="$({ du -sxk /home 2>/dev/null || true; } | awk '{print $1}')"
+[ -n "$HOME_KB" ] || die "could not measure /home with du"
 say "/home is $(( HOME_KB / 1024 / 1024 ))G on $(findmnt -n -o SOURCE /)"
 
 # ---------------------------------------------------------------------------
@@ -132,7 +135,7 @@ if [ "${#missing[@]}" -eq 0 ]; then
 else
   say "installing: ${missing[*]}"
   run apt-get "${APT_OPTS[@]}" update -qq
-  run DEBIAN_FRONTEND=noninteractive apt-get "${APT_OPTS[@]}" install -y -qq "${missing[@]}"
+  run env DEBIAN_FRONTEND=noninteractive apt-get "${APT_OPTS[@]}" install -y -qq "${missing[@]}"
 fi
 
 for t in rsync mkfs.btrfs btrfs; do
@@ -186,7 +189,7 @@ for procdir in /proc/[0-9]*; do
     target="$(readlink "$link" 2>/dev/null)" || continue
     case "$target" in
       /home/*)
-        busy+=("$pid $(tr -d '\0' < "$procdir/comm" 2>/dev/null) -> $target")
+        busy+=("$pid $(cat "$procdir/comm" 2>/dev/null || true) -> $target")
         break
         ;;
     esac
@@ -197,7 +200,7 @@ if [ "${#busy[@]}" -eq 0 ]; then
   say "no process has anything under /home open"
 else
   say "these processes are using /home:"
-  printf '        %s\n' "${busy[@]}" | head -20
+  printf '        %s\n' "${busy[@]:0:20}"
   [ "${#busy[@]}" -gt 20 ] && say "        ... and $(( ${#busy[@]} - 20 )) more"
   if [ -n "$FORCE" ]; then
     warn "FORCE=1 set -- continuing anyway. The copy may be inconsistent."
@@ -224,22 +227,22 @@ fi
 # subvolume rather than at the root keeps snapshots available later: you can
 # snapshot @home without the snapshots themselves living inside what you are
 # snapshotting.
-if [ -n "$CHECK" ] && [ -n "$NEEDS_MKFS" ]; then
-  say "would create subvolume $SUBVOL"
+if [ -n "$CHECK" ]; then
+  say "would create subvolume $SUBVOL, unless it already exists"
 else
-  run mkdir -p "$MNT"
   TOP="$(mktemp -d)"
-  run mount "$DISK" "$TOP"
-  if [ -n "$CHECK" ]; then
-    say "would create subvolume $SUBVOL"
-  elif btrfs subvolume show "$TOP/$SUBVOL" >/dev/null 2>&1; then
+  mount "$DISK" "$TOP"
+  # Don't leave the top level mounted on a temp dir if the create fails.
+  trap 'umount "$TOP" 2>/dev/null; rmdir "$TOP" 2>/dev/null' EXIT
+  if btrfs subvolume show "$TOP/$SUBVOL" >/dev/null 2>&1; then
     skip "subvolume $SUBVOL exists"
   else
     btrfs subvolume create "$TOP/$SUBVOL"
     say "created subvolume $SUBVOL"
   fi
-  run umount "$TOP"
+  umount "$TOP"
   rmdir "$TOP" 2>/dev/null || true
+  trap - EXIT
 fi
 
 # ---------------------------------------------------------------------------
@@ -281,15 +284,24 @@ if [ -n "$CHECK" ]; then
   # result of asking it to change nothing.
   if findmnt -n "$MNT" >/dev/null 2>&1; then
     say "running it with -n instead, to show what it would transfer:"
-    rsync -aHAXxn --delete --stats /home/ "$MNT/" | tail -20 | sed 's/^/        /'
+    { rsync -aHAXxn --delete --stats /home/ "$MNT/" || true; } | tail -20 | sed 's/^/        /'
   else
     say "($MNT is not mounted yet, so there is nothing to diff against --"
     say " re-run CHECK=1 once a real run has mounted it to see the delta)"
   fi
 else
   say "copying $(( HOME_KB / 1024 / 1024 ))G -- this takes a while"
-  rsync "${RSYNC_ARGS[@]}" || die "rsync failed. Nothing outside $MNT has changed;
-       fix the cause and re-run -- rsync picks up where it left off."
+  rc=0
+  rsync "${RSYNC_ARGS[@]}" || rc=$?
+  case "$rc" in
+    0) ;;
+    # 24 is "some source files vanished before they could be transferred":
+    # something deleted files under /home mid-copy. The verify step below
+    # decides whether what is left matters.
+    24) warn "rsync reports files vanished during the copy -- see the verify step" ;;
+    *) die "rsync failed (exit $rc). Nothing outside $MNT has changed;
+       fix the cause and re-run -- rsync picks up where it left off." ;;
+  esac
 fi
 
 # ---------------------------------------------------------------------------
@@ -300,20 +312,35 @@ if [ -n "$CHECK" ]; then
   say "would compare hardlink counts between /home and $MNT"
 else
   say "checking for anything rsync would still transfer..."
-  remaining="$(rsync -aHAXxn --delete --itemize-changes /home/ "$MNT/" | wc -l)"
+  rc=0
+  changes="$(rsync -aHAXxn --delete --itemize-changes /home/ "$MNT/")" || rc=$?
+  case "$rc" in
+    0|24) ;;
+    *) die "the verifying rsync -n failed (exit $rc)" ;;
+  esac
+  remaining="$(printf '%s' "$changes" | grep -c . || true)"
   if [ "$remaining" -eq 0 ]; then
     say "clean -- $MNT matches /home"
   else
-    warn "$remaining path(s) still differ. If a vx session was running during the"
-    warn "copy that is the reason. Re-run this script; the second pass is quick."
+    printf '%s\n' "$changes" | head -10 | sed 's/^/        /'
+    # Stop before fstab: once it points at $MNT, the next boot mounts the copy
+    # over the original and a re-run after that exits with "nothing to do", so
+    # these differences would never get copied.
+    if [ -n "$FORCE" ]; then
+      warn "$remaining path(s) still differ; FORCE=1 set -- switching over anyway."
+    else
+      die "$remaining path(s) still differ. If a vx session was running during the
+       copy that is the reason. Re-run this script; the second pass is quick.
+       (FORCE=1 switches over regardless.)"
+    fi
   fi
 
   # The specific failure worth naming, because it is silent: -H dropped, every
   # hardlink written as a separate copy, everything apparently fine until the
   # disk fills. Counting linked files on both sides catches it immediately.
   say "comparing hardlink counts (a minute or two)..."
-  src_links="$(find /home -xdev -type f -links +1 2>/dev/null | wc -l)"
-  dst_links="$(find "$MNT" -xdev -type f -links +1 2>/dev/null | wc -l)"
+  src_links="$({ find /home -xdev -type f -links +1 2>/dev/null || true; } | wc -l)"
+  dst_links="$({ find "$MNT" -xdev -type f -links +1 2>/dev/null || true; } | wc -l)"
   say "hardlinked files: $src_links in /home, $dst_links in $MNT"
   if [ "$dst_links" -lt $(( src_links * 9 / 10 )) ]; then
     die "the copy lost hardlinks -- $dst_links against $src_links.
@@ -349,7 +376,21 @@ else
     say "appended: $FSTAB_LINE"
     # An fstab that does not parse leaves the guest in an emergency shell on a
     # machine whose only console is `virsh console`. Cheap to check, expensive
-    # to skip.
+    # to skip. daemon-reload alone does not catch this -- the fstab generator
+    # logs bad lines and carries on -- so ask findmnt to parse it.
+    # Only blame the new line if the old file verified: an entry that was
+    # already there (a cdrom, a stale swap UUID) should not undo this step.
+    if findmnt --verify --tab-file /etc/fstab >/dev/null 2>&1; then
+      say "findmnt --verify is happy with /etc/fstab"
+    elif findmnt --verify --tab-file /etc/fstab.pre-btrfs-home >/dev/null 2>&1; then
+      findmnt --verify --tab-file /etc/fstab 2>&1 | sed 's/^/        /' || true
+      cp -a /etc/fstab.pre-btrfs-home /etc/fstab
+      die "the new /etc/fstab does not verify, so it has been restored from
+       /etc/fstab.pre-btrfs-home. The line that was rejected: $FSTAB_LINE"
+    else
+      warn "findmnt --verify already complained about /etc/fstab before this"
+      warn "script touched it -- check it by hand (findmnt --verify) before rebooting"
+    fi
     systemctl daemon-reload || warn "systemctl daemon-reload failed -- check /etc/fstab by hand before rebooting"
   fi
 fi
