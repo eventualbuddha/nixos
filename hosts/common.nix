@@ -94,6 +94,21 @@
   # "Unable to find a satisfying virtiofsd".
   virtualisation.libvirtd.qemu.vhostUserPackages = [ pkgs.virtiofsd ];
 
+  # USB passthrough from virt-manager's console ("Redirect USB device").
+  # spice-gtk shells out to `spice-client-glib-usb-acl-helper` to chown the
+  # device node, and that helper has to be privileged -- upstream ships it
+  # setuid, which the store cannot do. Without this, redirection fails with the
+  # helper simply not being found: nothing installs it onto PATH otherwise, so
+  # the error names a missing binary rather than a missing privilege.
+  #
+  # This option is the whole fix -- it puts a `cap_fowner+ep` wrapper in
+  # /run/wrappers/bin and installs spice-gtk for its polkit actions. Capability
+  # rather than full setuid, but the grant is still real: as upstream's
+  # description says, it lets unprivileged users hand *any* USB device on the
+  # machine to a VM. Acceptable on single-user desktops; it is the reason this
+  # is opt-in rather than on by default.
+  virtualisation.spiceUSBRedirection.enable = true;
+
   # Shared container config (/etc/containers/{policy.json,registries.conf,...}).
   # podman is a home-manager package from home/toolchains.nix, which installs
   # the binary but nothing system-level -- and containers/image refuses to run
