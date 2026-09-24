@@ -15,6 +15,8 @@ flake.nix
 hosts/
   common.nix              # shared system config across every machine
   <hostname>/             # host-specific: hostname, hardware quirks, overrides
+modules/                  # opt-in system modules, imported by the hosts that want them
+  vmguard.nix             # the vxsuite VM's egress proxy (work + judy)
 home/                     # home-manager for "brian"
   core/                   # portable: shell, editor, git, CLI tooling
   desktop/                # niri, noctalia, ghostty, GUI apps, theming
@@ -121,29 +123,49 @@ and that key does not belong here. The script detects whether it has run and
 adapts. Still by hand afterwards: `claude /login`, moving the guest's NIC onto the
 isolated network, and cloning vxsuite into `~/code/vxsuite`.
 
-## VMGuard: the vxsuite VM's egress proxy (work only)
+## VMGuard: a vxsuite VM's egress proxy (work, judy)
 
-The vxsuite guest sits on an isolated libvirt network (`vmguard`) with no route
-off its own subnet. `hosts/work/vmguard.nix` runs the mitmproxy-based egress
+A vxsuite guest sits on an isolated libvirt network (`vmguard`) with no route
+off its own subnet. `modules/vmguard.nix` runs the mitmproxy-based egress
 gate that is its *only* way out: reads flow, writes are pinned to specific orgs,
 a host-side GitHub PAT is injected so the guest never holds a credential, and
-anything unrecognized is denied and logged. `hosts/work/vmguard/` holds the
+anything unrecognized is denied and logged. `modules/vmguard/` holds the
 policy addon, its offline tests, and `NOTES.md` -- the rationale for every rule
 in it, which is what to read before widening anything.
 
-The service is declarative. Two files are not, because a git repo is the wrong
-place for either, and the service will not work without them:
+Both `work` and `judy` run a guest and import the module; it is opt-in per host,
+not in `hosts/common.nix`. Each host is otherwise independent: its own libvirt
+network, its own guest, its own PAT and its own CA. What they share is the
+address, `192.168.124.1:8080` on `virbr-guard`, identical on both so a guest
+image's baked-in proxy config works whichever machine boots it.
+
+The service is declarative. Three things are not -- a git repo is the wrong
+place for the first two, and NixOS has no declarative option for the third --
+and the service will not work without them. All are per-host:
 
 1. **`/etc/vmguard/secrets.env`** -- root-owned `0600`, `GH_PAT` and optionally
-   `CIRCLE_TOKEN`. Copy `hosts/work/vmguard/secrets.env.template` and fill it
+   `CIRCLE_TOKEN`. Copy `modules/vmguard/secrets.env.template` and fill it
    in. Without this the unit fails to start at all (`EnvironmentFile`).
 
 2. **`/var/lib/vmguard/mitmproxy-conf/`** -- the MITM CA, private key included.
-   This has to be **preserved, never regenerated**. The guest's trust store
-   already contains this exact CA, so if mitmproxy mints a fresh one on an empty
-   confdir the service comes up looking perfectly healthy and every TLS-bumped
+   On a host doing this for the first time, let mitmproxy generate one on the
+   empty confdir and install the resulting `mitmproxy-ca-cert.pem` into that
+   host's guest's trust store. From then on it has to be **preserved, never
+   regenerated**: the guest's trust store contains that exact CA, so a fresh one
+   leaves the service looking perfectly healthy while every TLS-bumped
    connection inside the guest fails with no obvious cause. Restore the old
-   directory, `chown -R vmguard:vmguard` it, and restart.
+   directory, `chown -R vmguard:vmguard` it, and restart. The two hosts' CAs are
+   separate keys and are not copied between machines -- a guest is paired with
+   the CA of the machine it runs on.
+
+3. **The `vmguard` libvirt network, and the guest's NIC on it.** An isolated
+   net (no `<forward>`) on `192.168.124.0/24`, bridge `virbr-guard`, with a
+   static DHCP reservation for the guest's MAC at `192.168.124.179` -- the
+   address `hosts/<host>/configuration.nix` names. Until it exists the unit's
+   `preStart` waits 60s for `192.168.124.1` to appear and then fails with that
+   as the reason. `modules/vmguard/NOTES.md` items 6-7 are the original
+   walkthrough; moving a guest's NIC off `default` onto it is the last step,
+   and it is what actually cuts off direct egress.
 
 The guest half is not managed from here at all -- it lives in the VM's disk
 image: the CA in its trust store, `/etc/profile.d/vmguard.sh` (bash),
@@ -155,28 +177,38 @@ network.
 
 ### Changing the policy
 
-Edit `hosts/work/vmguard/egress_filter.py`, run the tests, then apply. That is the
+Edit `modules/vmguard/egress_filter.py`, run the tests, then apply. That is the
 whole deploy -- the addon is staged into the Nix store by `vmguard.nix` and the
 unit's `ExecStart` names that store path, so an edit changes the path, which
 changes the unit, which makes the switch restart the service.
 
 ```
-cd hosts/work/vmguard
+cd modules/vmguard
 nix-shell -p python3 --run 'GH_PAT=dummy VMGUARD_DENYLOG=/tmp/t.log python3 tests/test_filter.py'
-cd ../../.. && ./apply.sh                    # sudo nixos-rebuild switch --flake .#work
+cd ../.. && ./apply.sh                       # sudo nixos-rebuild switch --flake .#<this host>
 systemctl show vmguard-github -p ExecStart --value | grep -o 'egress_filter[^ ]*'
 ```
+
+The policy is one file shared by both hosts, so a change is only live on the one
+you switched -- apply on `work` and `judy` both, or they drift. The store path is
+content-addressed and the module is identical on each, so the *same* hash is
+what should come back from either.
 
 The tests are offline (they stub mitmproxy and mock the org resolver) and need a
 dummy `GH_PAT` only because the addon reads it at import. The last line confirms
 the running service picked up the new store path; compare it against
-`nix eval --raw '.#nixosConfigurations.work.config.systemd.services.vmguard-github.serviceConfig.ExecStart'`.
+`nix eval --raw '.#nixosConfigurations.<host>.config.systemd.services.vmguard-github.serviceConfig.ExecStart'`.
 
-Read `hosts/work/vmguard/NOTES.md` before widening anything -- it carries the
+Read `modules/vmguard/NOTES.md` before widening anything -- it carries the
 rationale for every rule, and the deny log is the evidence a new rule should be
 built from.
 
 ### Operating it
+
+Everything below is per-host: run it on the machine whose guest you are asking
+about. The ssh alias differs too -- `vx` is work's guest from anywhere, and
+judy's own is `vx.judy`, which only judy can reach (see the aliases in
+`hosts/judy/configuration.nix`).
 
 The host has no system `python3` and no `just`; commands needing python go
 through `nix-shell -p python3`.
@@ -220,13 +252,13 @@ tail -n 1000 /var/lib/vmguard/requests.log | grep '"kind": "WRITE"'
 read when deciding whether to widen `MUTATION_ALLOW`:
 
 ```
-cd hosts/work/vmguard && nix-shell -p python3 --run './gql-denies.py'
+cd modules/vmguard && nix-shell -p python3 --run './gql-denies.py'
 ```
 
 **The guest's Claude credential expiry** (runs in the guest, over ssh):
 
 ```
-ssh vx python3 < hosts/work/vmguard/check-creds.py
+ssh vx python3 < modules/vmguard/check-creds.py        # or: ssh vx.judy, on judy
 ```
 
 **Rotating a credential.** `secrets.env` is deliberately outside the repo and

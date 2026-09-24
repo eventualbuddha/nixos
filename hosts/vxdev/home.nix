@@ -233,7 +233,7 @@
     # just interactive ones, since a non-interactive shell that reaches the
     # network needs the proxy just as much.
     bashrcExtra = ''
-      # Egress from this guest goes through the vmguard proxy on `work`. The
+      # Egress from this guest goes through the vmguard proxy on its host. The
       # fish half of this is hosts/vxdev/fish/20-vmguard.fish; guest-setup.sh
       # writes the file being sourced.
       [ -f /etc/profile.d/vmguard.sh ] && . /etc/profile.d/vmguard.sh

@@ -249,7 +249,14 @@
       # No ControlPersist: that governs how long an auto-started master lingers
       # after its last client, and this master isn't auto-started -- it lives
       # exactly as long as the unit does.
-      Host vx
+      # `vx.*` is here so a machine running a second guest can name it without
+      # restating any of the above. judy is the one that does -- it has a
+      # vxsuite VM of its own behind its own egress proxy, reached as `vx.judy`
+      # -- and the bare `vx` still means work's guest everywhere, including
+      # there. The multiplexing settings are inert for the qualified names:
+      # `ControlMaster no` makes every alias a pure client, and only
+      # tunnel-frontend-master.service ever creates a master, for `vx` alone.
+      Host vx vx.*
         User vx
         ForwardAgent yes
         ControlMaster no

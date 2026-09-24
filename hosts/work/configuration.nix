@@ -12,7 +12,7 @@
 let
   # The guest's address on the `vmguard` bridge: a static DHCP reservation
   # keyed on the guest's MAC in the network definition, so it doesn't drift
-  # (hosts/work/vmguard/NOTES.md item 7).
+  # (modules/vmguard/NOTES.md item 7).
   #
   # Bound to a name because two separate things need it and must not drift
   # apart: the `Host vx` block below, and the relay's proxy target.
@@ -22,7 +22,7 @@ in
   imports = [
     ./hardware-configuration.nix
     ../common.nix
-    ./vmguard.nix
+    ../../modules/vmguard.nix
   ];
 
   networking.hostName = "work";

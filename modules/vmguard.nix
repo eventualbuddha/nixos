@@ -1,4 +1,9 @@
-# VMGuard -- the egress gate for the vxsuite VM.
+# VMGuard -- the egress gate for a vxsuite VM.
+#
+# Opt-in per host: imported by every machine that runs a vxsuite guest (work,
+# judy), not from hosts/common.nix. A host importing this is asserting it has
+# the `vmguard` libvirt network defined and a guest sitting on it; without that
+# the unit's preStart times out and the service fails, by design.
 #
 # The guest sits on the isolated `vmguard` libvirt network and has no route off
 # its own subnet, deliberately. This proxy, bound to the host's address on that
@@ -8,22 +13,29 @@
 # denied and logged. ./vmguard/NOTES.md is the rationale for each rule and
 # README.md the day-to-day operations (deny-log triage, audit trail).
 #
-# Ported from the Fedora install this machine replaces, where it was a
-# hand-rolled venv under /opt plus a unit dropped in /etc/systemd/system.
-# nixpkgs carries the same mitmproxy the venv had (12.2.3), so the addon runs
-# byte-for-byte unchanged against the API it was written for.
+# The addresses below are the same on every host rather than per-host, which is
+# what keeps the guest side portable: the proxy variables baked into a guest's
+# disk image (and hosts/vxdev/) name 192.168.124.1:8080 literally, so a guest
+# image works unchanged on whichever machine it is booted on. The networks are
+# isolated and never peer, so two hosts owning the same subnet costs nothing.
+#
+# Ported from the Fedora install `work` replaces, where it was a hand-rolled
+# venv under /opt plus a unit dropped in /etc/systemd/system. nixpkgs carries
+# the same mitmproxy the venv had (12.2.3), so the addon runs byte-for-byte
+# unchanged against the API it was written for.
 #
 # Two pieces are deliberately NOT declared here, because a git repo is the wrong
-# place for either:
+# place for either, and both are per-host:
 #
 #   /etc/vmguard/secrets.env            GH_PAT + CIRCLE_TOKEN, root-owned 0600.
 #   /var/lib/vmguard/mitmproxy-conf/    the MITM CA -- including its private key.
 #
-# The CA in particular has to be *preserved* rather than regenerated: the
-# guest's trust store already contains this exact CA (guest-setup.sh installed
-# it there), so letting mitmproxy mint a fresh one would break every bumped TLS
-# connection inside the guest with no obvious cause. Both are one-time manual
-# steps; see the VMGuard section of README.md.
+# Each host has its own CA, and a host's CA has to be *preserved* rather than
+# regenerated once its guest trusts it: letting mitmproxy mint a fresh one on an
+# empty confdir would break every bumped TLS connection inside that guest with
+# no obvious cause. The keys are not shared between hosts either -- a guest is
+# paired with the CA of the machine it runs on. Both are one-time manual steps;
+# see the VMGuard section of README.md.
 
 { lib, pkgs, ... }:
 
@@ -31,7 +43,8 @@ let
   # The host's own address on virbr-guard, and the port the guest's
   # HTTP(S)_PROXY variables already point at (/etc/profile.d/vmguard.sh and
   # /etc/fish/conf.d/vmguard.fish inside the guest). Changing either of these
-  # means editing the guest too.
+  # means editing every guest too -- see the header on why they are not
+  # per-host.
   listenHost = "192.168.124.1";
   listenPort = 8080;
 

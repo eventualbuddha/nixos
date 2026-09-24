@@ -173,7 +173,7 @@ else
        The nixos.org hosts are allowlisted read-only in the egress filter (NOTES 46),
        so on the isolated network this most likely means \`guest-setup.sh\` has not
        run here yet -- no MITM CA, no proxy env, no egress at all. If it has, check
-       that the deployed addon on work matches hosts/work/vmguard/egress_filter.py
+       that the addon deployed on this guest's host matches modules/vmguard/egress_filter.py
        (the deny-log query in README.md will show the 403)."
     fi
   done
