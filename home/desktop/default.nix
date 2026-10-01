@@ -14,6 +14,7 @@ _:
     ./apps.nix
     ./theme.nix
     ./tunnels.nix
+    ./vx-files.nix
     ./helium.nix
   ];
 }

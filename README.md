@@ -289,3 +289,60 @@ recipes are the commands above. Its one-time install steps (`net-up`, `install`,
 `firewall-open`, `logrotate-install`) are now declared in `vmguard.nix`, and the
 guest-side steps (`guest-setup`, `move-nic`) were done once and live in the VM's
 disk image. `NOTES.md` keeps the full Fedora-era record.
+
+## Moving files in and out of the vxsuite VM
+
+The guest is assumed compromised, so the rule for file transfer is about who
+initiates: anything *the host* starts over the SSH connection it already holds
+is fine in either direction, and nothing may give the guest a channel it can
+drive itself (a writable share into the host, guest-to-host SSH, a shared SPICE
+clipboard). `home/desktop/vx-files.nix` is the host side of that; the shares
+below live in libvirt's state and the guest's fstab, because NixOS has no
+declarative libvirt domains.
+
+**Out of the guest.** `vx-mount` puts the guest's home at `~/vx`, read-only,
+over sshfs under a user service (`vx-umount` drops it). From there Loupe opens a
+built PNG, a browser file picker can attach one to Slack, and `wl-copy` works on
+it. Not an automount: autofs needs CAP_SYS_ADMIN and the user manager rejects
+such units, and a system-level fstab entry would run sshfs as root without this
+user's ssh config or key. Not started at login: the guest is often off, and a
+retry loop against a touch-only key is a YubiKey blinking for nobody. For the
+one-image case, `vxclip <path>` reads a guest file straight onto the clipboard
+with its MIME type (paste into Slack), and `vxopen <path>` copies it into
+`~/vx-stage/` and opens it. Neither needs the mount.
+
+**Into the guest.** `~/vx-inbox` on the host is a fourth virtiofs share, read-only
+in the guest at `/vx/inbox`, next to the three repo shares. `vxget <url>` downloads
+on the host into it, for the file the egress proxy would refuse; `vxpush <file>`
+copies local files there. The share is the whole mechanism, so a browser can
+also just download into `~/vx-inbox`. If a download *source* recurs, add a
+GET-only allow to `modules/vmguard/egress_filter.py` with a NOTES.md entry
+rather than reaching for the inbox every time.
+
+Adding the inbox share to a guest that lacks it (done on work 2026-10-01; judy's
+guest is the same image, so it needs only the host half):
+
+```
+# host: attach the share. --live works (libvirt 12 / QEMU 11 hotplug virtiofs),
+# --config persists it; the source dir must exist or the domain will not start,
+# which is why home/desktop/vx-files.nix creates it.
+cat > /tmp/inbox.xml <<'XML'
+<filesystem type='mount' accessmode='passthrough'>
+  <driver type='virtiofs'/>
+  <source dir='/home/brian/vx-inbox'/>
+  <target dir='inbox'/>
+  <readonly/>
+</filesystem>
+XML
+virsh attach-device vxsuite /tmp/inbox.xml --live --config
+
+# guest: same options as the other three shares; nofail so a host without the
+# share still boots the image.
+sudo mkdir -p /vx/inbox
+echo 'inbox         /vx/inbox                 virtiofs  ro,nosuid,nodev,noexec,nofail  0 0' | sudo tee -a /etc/fstab
+sudo systemctl daemon-reload && sudo mount /vx/inbox
+```
+
+Files written by uid 1000 on the host show up in the guest owned by whatever
+name the guest gives that uid (`vx-services`, currently). Cosmetic: they are
+world-readable, which is what the guest needs.
