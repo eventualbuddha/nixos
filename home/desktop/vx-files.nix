@@ -91,6 +91,36 @@ in
   };
 
   programs.fish.functions = {
+    # Tab-completion for guest paths, for vxclip and vxopen. Lists the
+    # directory part of the current token over SSH, with `/` on directories so
+    # fish (auto_space) leaves off the trailing space and the next Tab descends
+    # into it. One ssh handshake per Tab; on a local guest that is a fraction
+    # of a second, and BatchMode keeps a guest that is off from hanging the
+    # prompt on a password it would never get. `~` is the one shell expansion
+    # worth preserving through the quoting, since it is how a path in the
+    # guest home is naturally typed.
+    __vx_complete_guest_path = {
+      description = "Complete a path inside the vxsuite guest";
+      body = ''
+        set -l tok (commandline -ct)
+        set -l dir (string replace -r '[^/]*$' "" -- $tok)
+        # Dotfiles only once the name part starts with a dot, as fish does for
+        # local paths.
+        set -l flags -1pL
+        string match -q '.*' -- (string replace -r '^.*/' "" -- $tok); and set flags -1ApL
+        switch "$dir"
+          case ""
+            set -f remote .
+          case "~/*"
+            set -f remote '"$HOME"'(string escape -- (string sub -s 2 -- $dir))
+          case "*"
+            set -f remote (string escape -- $dir)
+        end
+        ssh -o BatchMode=yes -o ConnectTimeout=3 vx "ls $flags -- $remote" 2>/dev/null \
+          | string replace -r '^' -- $dir
+      '';
+    };
+
     vx-mount = {
       description = "Mount the vxsuite guest's home read-only at ~/vx";
       body = ''
@@ -186,5 +216,15 @@ in
         end
       '';
     };
+  };
+
+  # Autoloaded completions (fish reads ~/.config/fish/completions/<cmd>.fish on
+  # first use). -f turns off local-file completion, which would otherwise
+  # offer this machine's files for a path that is resolved in the guest.
+  xdg.configFile = {
+    "fish/completions/vxclip.fish".text =
+      "complete -c vxclip -f -a '(__vx_complete_guest_path)'\n";
+    "fish/completions/vxopen.fish".text =
+      "complete -c vxopen -f -a '(__vx_complete_guest_path)'\n";
   };
 }
