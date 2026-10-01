@@ -199,11 +199,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1790897047,
-        "narHash": "sha256-w9B5lhV5CL7If9Yw8791+Cu+mxORYkaG50wEhmsueT0=",
+        "lastModified": 1790897545,
+        "narHash": "sha256-B80j3GWk4fQaHtklwH+HYLk1hg25CAiB/4zqQakdCMQ=",
         "owner": "eventualbuddha",
         "repo": "virsh-usb",
-        "rev": "6b8c97da691687a951679db6741c84c37e88bfbc",
+        "rev": "2305eb3e27c9ce45b78a729b3638d6890bdeb08a",
         "type": "github"
       },
       "original": {
