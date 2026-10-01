@@ -62,6 +62,11 @@
       ];
     };
 
+    # Launcher: hide the category filter row (toggled off in the settings
+    # UI; mirrored here so it survives a fresh state dir). Same key the UI
+    # writes to ~/.local/state/noctalia/settings.toml.
+    shell.launcher.categories = false;
+
     # IP-based geolocation, feeding both the weather widget and night light.
     location.auto_locate = true;
     weather = {
