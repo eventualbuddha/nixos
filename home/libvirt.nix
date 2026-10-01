@@ -1,6 +1,12 @@
-_:
+{ inputs, ... }:
 
 {
+  # virsh-usb -- attach real and virtual USB devices to the vxsuite VM. It is
+  # NixOS-only for the same reason the env var below is: it drives the system
+  # libvirtd that hosts/common.nix runs, which the Debian guest does not have.
+  # Pinned in flake.lock; `nix flake update virsh-usb` to bump.
+  imports = [ inputs.virsh-usb.homeModules.default ];
+
   # `virsh` with no --connect defaults to `qemu:///session`, the per-user
   # libvirt instance, which has its own (empty) set of domains. Every VM here
   # -- vxsuite included -- is defined in the system instance that

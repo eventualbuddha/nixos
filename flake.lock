@@ -188,7 +188,28 @@
         "nixpkgs": "nixpkgs_2",
         "noctalia": "noctalia",
         "proj": "proj",
+        "virsh-usb": "virsh-usb",
         "zen-browser": "zen-browser"
+      }
+    },
+    "virsh-usb": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1790896387,
+        "narHash": "sha256-2sUFuMtMtU1Np6QOEXtiu/K4Ysxt4npRgJxbWIAArvY=",
+        "owner": "eventualbuddha",
+        "repo": "virsh-usb",
+        "rev": "44a2aaeaf38e710f9a70cd38c7460ff1a0b8bdb5",
+        "type": "github"
+      },
+      "original": {
+        "owner": "eventualbuddha",
+        "repo": "virsh-usb",
+        "type": "github"
       }
     },
     "xwayland-satellite-stable": {

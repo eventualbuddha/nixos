@@ -38,6 +38,14 @@
       url = "github:eventualbuddha/proj";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # The libvirt USB attach/detach CLI, consumed through its `homeModules.default`
+    # from home/libvirt.nix. NixOS hosts only (judy, work): the Debian guest in
+    # hosts/vxdev has no libvirtd to point it at.
+    virsh-usb = {
+      url = "github:eventualbuddha/virsh-usb";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
