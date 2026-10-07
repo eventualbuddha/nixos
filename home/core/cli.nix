@@ -57,6 +57,7 @@ in
     # CLI quality-of-life
     gh # GitHub CLI
     lazygit
+    difftastic
     ripgrep # rg
     dust # nicer `du` (you asked for "df-dust" -- the package/binary is `dust`)
     duf # nicer `df`, pairs with dust
