@@ -1006,6 +1006,12 @@ check("ro48/circle_support_post", gh("/hc/en-us", "POST", host="support.circleci
 # exact hosts: support.circleci.com is not circleci.com, which has its own handler (section 3a)
 check("ro48/circle_support_no_creds", hdrs("/hc/en-us", "GET", "support.circleci.com"), {})
 
+# ---- viteplus.dev (NOTES 55): vite-plus docs, the same doc-site shape as vitest.dev ----
+check("ro55/viteplus_docs",     gh("/guide/", "GET", host="viteplus.dev"), "allow")
+check("ro55/viteplus_root",     gh("/", "GET", host="viteplus.dev"), "allow")
+check("ro55/viteplus_post",     gh("/guide/", "POST", host="viteplus.dev"), "deny")
+check("ro55/viteplus_no_creds", hdrs("/guide/", "GET", "viteplus.dev"), {})
+
 try:
     os.remove(os.environ["VMGUARD_DENYLOG"])
 except OSError:

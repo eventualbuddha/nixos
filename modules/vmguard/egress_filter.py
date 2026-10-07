@@ -899,6 +899,13 @@ READ_ONLY_HOSTS = {"api.mason-registry.dev", "downloads.claude.ai", "herdr.dev",
                    # is a distinct host from `circleci.com`, which has its own handler in section
                    # 3a — entries here are exact hosts, so this grants nothing there.
                    "vitest.dev", "support.circleci.com",
+                   #
+                   # vite-plus's docs (NOTES 55): `GET /` and `/guide/`, two 403s on 2026-10-07,
+                   # the same shape as vitest.dev above — the agent reading the manual for the
+                   # `vp` the guest already runs. The binary itself is not fetched from here:
+                   # home/vite-plus.nix pins it from a GitHub release, and the toolchains vp
+                   # installs come from nodejs.org and registry.npmjs.org, both open above.
+                   "viteplus.dev",
                    }
 
 # The read-only hosts that cannot be listed exactly, as full-match patterns: same policy as

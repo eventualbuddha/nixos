@@ -1599,6 +1599,22 @@ needs doing, and how to back everything out.
     - Deploy: `./apply.sh` on `work` (unit and addon), then `./apply.sh` on vx to run the
       bootstrap.
 
+55. **`viteplus.dev` opened read-only (2026-10-07, on request).** The deny log showed exactly
+    two hits, seconds apart: `GET /` and `GET /guide/`, both `host not on allowlist`. That is
+    the item-31 doc-site shape — the agent reading the manual for `vp`, which the guest
+    already runs — and it gets the same answer `vitest.dev` got in item 48: `READ_ONLY_HOSTS`,
+    GET/HEAD only, no credentials injected, writes denied.
+    - Nothing executable rides on this. `home/vite-plus.nix` pins the `vp` binary from a
+      GitHub release (`objects.githubusercontent.com`, long open), and the node and pnpm
+      toolchains vp installs come from `nodejs.org` and `registry.npmjs.org`, open since
+      item 13 (and `unofficial-builds.nodejs.org`, item 47). The host serves docs, and a
+      docs host is all this admits.
+    - Exact host, as always: nothing under `*.viteplus.dev` is reachable until it shows up in
+      the deny log with a reason.
+    - Tests +4: `/` and `/guide/` GET allowed, POST denied, no headers injected.
+    - Deploy: `./apply.sh` on `work`, then on `judy` — the policy is one file shared by both
+      hosts, and a change is live only where it was switched.
+
 ## Running it: `Justfile` (RETIRED)
 
 > **THE JUSTFILE IS GONE, DELETED IN THE NIXOS PORT (2026-08-28).** This section, and the two
