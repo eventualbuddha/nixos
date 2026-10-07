@@ -912,6 +912,15 @@ READ_ONLY_HOSTS = {"api.mason-registry.dev", "downloads.claude.ai", "herdr.dev",
                    # doc-site shape as vitest.dev and viteplus.dev. The binaries are not fetched
                    # from here: the npm packages come from registry.npmjs.org, open above.
                    "oxc.rs",
+                   #
+                   # VS Code's server download (NOTES 57): Remote-SSH fetches
+                   # /commit:<sha>/server-linux-x64/stable (and the cli-alpine-x64 bootstrap)
+                   # from the update host, which 302s the tarball to the prss host — the same
+                   # redirect-target pair as cdn.playwright.dev above, so both are listed. The
+                   # server's own traffic once running (marketplace, exp-tas, telemetry) is not
+                   # opened by this; see NOTES 57 for what stays shut.
+                   "update.code.visualstudio.com",
+                   "vscode.download.prss.microsoft.com",
                    }
 
 # The read-only hosts that cannot be listed exactly, as full-match patterns: same policy as

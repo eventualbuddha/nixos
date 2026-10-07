@@ -1630,6 +1630,33 @@ needs doing, and how to back everything out.
       injected.
     - Deploy: `./apply.sh` on `work`, then on `judy`.
 
+57. **VS Code server download opened read-only (2026-10-07, from the deny log).** Remote-SSH
+    into the guest 403'd at `update.code.visualstudio.com GET
+    /commit:a5b50095…/server-linux-x64/stable` (15:13:00). Checked from the host: that URL is a
+    302 to `vscode.download.prss.microsoft.com/dbazure/download/stable/<sha>/
+    vscode-server-linux-x64.tar.gz`, and the `cli-alpine-x64/stable` bootstrap the newer
+    Remote-SSH flow uses 302s to the same prss host. So this is the item-31 playwright shape —
+    a front host that redirects the payload elsewhere — and gets the same answer: both hosts
+    in `READ_ONLY_HOSTS`, GET/HEAD only, no credentials injected, writes denied.
+    - **This admits an executable**, like `downloads.claude.ai` and `releases.openai.com`
+      (item 54): the server tarball is Microsoft-signed over TLS to a Microsoft host, and the
+      guest runs it either way — the log shows the server already up and phoning out 24
+      seconds after the download was denied, which is Remote-SSH's local-download-and-scp
+      fallback. Opening the fetch changes where the bytes come from, not what runs.
+    - **Seen in the same burst and deliberately not opened:** `marketplace.visualstudio.com`
+      (extension gallery; the `extensionquery` is a POST), `main.vscode-cdn.net`
+      (`/extensions/marketplace.json`, `copilotChat.json` recommendation manifests),
+      `default.exp-tas.com` (`/vscode/ab`, A/B experiment assignment), and
+      `mobile.events.data.microsoft.com` (`/OneCollector/1.0`, telemetry, 20+ POSTs/min).
+      None was asked for; the editor connects and works without them. The telemetry one
+      stays shut on the standing rule (item 31's `play.googleapis.com` call). If extensions
+      on the remote turn out to matter, that is a separate ask with its own POST to weigh.
+    - Exact hosts: `*.visualstudio.com` and `*.prss.microsoft.com` stay denied beyond the two
+      names listed (the playwright prss host is its own entry, item 31).
+    - Tests +11: both hosts' GET allowed, POST denied, no headers injected; the cli-alpine
+      path allowed; the four not-opened hosts pinned denied.
+    - Deploy: `./apply.sh` on `work`, then on `judy`.
+
 ## Running it: `Justfile` (RETIRED)
 
 > **THE JUSTFILE IS GONE, DELETED IN THE NIXOS PORT (2026-08-28).** This section, and the two

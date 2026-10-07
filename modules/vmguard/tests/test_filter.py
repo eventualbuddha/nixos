@@ -1018,6 +1018,22 @@ check("ro56/oxc_root",     gh("/", "GET", host="oxc.rs"), "allow")
 check("ro56/oxc_post",     gh("/docs/guide/usage/linter.html", "POST", host="oxc.rs"), "deny")
 check("ro56/oxc_no_creds", hdrs("/docs/guide/usage/linter.html", "GET", "oxc.rs"), {})
 
+# ---- VS Code server download (NOTES 57): update host 302s to the prss host; both read-only ----
+_VSC_SRV = "/commit:a5b500951314efd502d07465bd138dfbd714a960/server-linux-x64/stable"
+_VSC_TGZ = "/dbazure/download/stable/a5b500951314efd502d07465bd138dfbd714a960/vscode-server-linux-x64.tar.gz"
+check("ro57/vscode_update_get",  gh(_VSC_SRV, "GET", host="update.code.visualstudio.com"), "allow")
+check("ro57/vscode_update_cli",  gh("/commit:a5b500951314efd502d07465bd138dfbd714a960/cli-alpine-x64/stable", "GET", host="update.code.visualstudio.com"), "allow")
+check("ro57/vscode_update_post", gh(_VSC_SRV, "POST", host="update.code.visualstudio.com"), "deny")
+check("ro57/vscode_update_no_creds", hdrs(_VSC_SRV, "GET", "update.code.visualstudio.com"), {})
+check("ro57/vscode_prss_get",    gh(_VSC_TGZ, "GET", host="vscode.download.prss.microsoft.com"), "allow")
+check("ro57/vscode_prss_post",   gh(_VSC_TGZ, "POST", host="vscode.download.prss.microsoft.com"), "deny")
+check("ro57/vscode_prss_no_creds", hdrs(_VSC_TGZ, "GET", "vscode.download.prss.microsoft.com"), {})
+# the server's own hosts, seen in the same deny-log burst, stay shut (not asked for; telemetry never)
+check("ro57/vscode_marketplace_shut", gh("/_apis/public/gallery/extensionquery", "POST", host="marketplace.visualstudio.com"), "deny")
+check("ro57/vscode_cdn_shut",         gh("/extensions/marketplace.json", "GET", host="main.vscode-cdn.net"), "deny")
+check("ro57/vscode_exptas_shut",      gh("/vscode/ab", "GET", host="default.exp-tas.com"), "deny")
+check("ro57/vscode_telemetry_shut",   gh("/OneCollector/1.0", "POST", host="mobile.events.data.microsoft.com"), "deny")
+
 try:
     os.remove(os.environ["VMGUARD_DENYLOG"])
 except OSError:
