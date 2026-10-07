@@ -1615,6 +1615,21 @@ needs doing, and how to back everything out.
     - Deploy: `./apply.sh` on `work`, then on `judy` — the policy is one file shared by both
       hosts, and a change is live only where it was switched.
 
+56. **`oxc.rs` opened read-only (2026-10-07, on request).** Asked for directly, not pulled from
+    the deny log (the proxy host was not reachable from the editing session, so no hit count
+    is recorded here). The host is the docs site for oxc — oxlint, oxfmt, and the parser and
+    resolver that vite-plus (item 55) bundles — so it is the item-31 doc-site shape again and
+    gets the vitest.dev/viteplus.dev answer: `READ_ONLY_HOSTS`, GET/HEAD only, no credentials
+    injected, writes denied.
+    - Nothing executable rides on this. The oxc binaries ship as npm packages from
+      `registry.npmjs.org` (open since item 13) and ride inside the `vp` binary pinned by
+      `home/vite-plus.nix`. The host serves docs, and a docs host is all this admits.
+    - Exact host, as always: nothing under `*.oxc.rs` is reachable until it shows up in the
+      deny log with a reason.
+    - Tests +4: `/` and `/docs/guide/usage/linter.html` GET allowed, POST denied, no headers
+      injected.
+    - Deploy: `./apply.sh` on `work`, then on `judy`.
+
 ## Running it: `Justfile` (RETIRED)
 
 > **THE JUSTFILE IS GONE, DELETED IN THE NIXOS PORT (2026-08-28).** This section, and the two

@@ -1012,6 +1012,12 @@ check("ro55/viteplus_root",     gh("/", "GET", host="viteplus.dev"), "allow")
 check("ro55/viteplus_post",     gh("/guide/", "POST", host="viteplus.dev"), "deny")
 check("ro55/viteplus_no_creds", hdrs("/guide/", "GET", "viteplus.dev"), {})
 
+# ---- oxc.rs (NOTES 56): oxc docs (oxlint/oxfmt), the same doc-site shape as viteplus.dev ----
+check("ro56/oxc_docs",     gh("/docs/guide/usage/linter.html", "GET", host="oxc.rs"), "allow")
+check("ro56/oxc_root",     gh("/", "GET", host="oxc.rs"), "allow")
+check("ro56/oxc_post",     gh("/docs/guide/usage/linter.html", "POST", host="oxc.rs"), "deny")
+check("ro56/oxc_no_creds", hdrs("/docs/guide/usage/linter.html", "GET", "oxc.rs"), {})
+
 try:
     os.remove(os.environ["VMGUARD_DENYLOG"])
 except OSError:

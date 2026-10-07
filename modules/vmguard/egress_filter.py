@@ -906,6 +906,12 @@ READ_ONLY_HOSTS = {"api.mason-registry.dev", "downloads.claude.ai", "herdr.dev",
                    # home/vite-plus.nix pins it from a GitHub release, and the toolchains vp
                    # installs come from nodejs.org and registry.npmjs.org, both open above.
                    "viteplus.dev",
+                   #
+                   # oxc's docs (NOTES 56): the JS linter/parser/resolver family (oxlint, oxfmt,
+                   # oxc_parser) that vite-plus above bundles — opened on request, the same
+                   # doc-site shape as vitest.dev and viteplus.dev. The binaries are not fetched
+                   # from here: the npm packages come from registry.npmjs.org, open above.
+                   "oxc.rs",
                    }
 
 # The read-only hosts that cannot be listed exactly, as full-match patterns: same policy as
