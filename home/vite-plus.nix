@@ -47,14 +47,14 @@ let
   # `nix store prefetch-file --json <release-url>`).
   vite-plus =
     let
-      version = "0.3.0";
+      version = "1.1.0";
     in
     pkgs.stdenvNoCC.mkDerivation {
       pname = "vite-plus";
       inherit version;
       src = pkgs.fetchurl {
         url = "https://github.com/voidzero-dev/vite-plus/releases/download/v${version}/vp-x86_64-unknown-linux-gnu.tar.gz";
-        hash = "sha256-aOAquir4d8OPGepADnMB0IPqGOrYdx3IB1eBLCSsxNA=";
+        hash = "sha256-e37+nCF7lB498pg27GmJquVMCCxzy5vn1bkTR/WbDds=";
       };
       sourceRoot = ".";
 
