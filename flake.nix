@@ -46,6 +46,14 @@
       url = "github:eventualbuddha/virsh-usb";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # ArtCraft apps (open-source Adobe-suite alternatives), packaged from their
+    # release AppImages. Consumed through its `nixosModules.default` from
+    # hosts/common.nix; `nix flake update artcraft` picks up new releases.
+    artcraft = {
+      url = "github:ipeglin/artcraft-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =

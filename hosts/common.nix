@@ -10,7 +10,26 @@
   ...
 }:
 
+let
+  # The ArtCraft apps, built against this pkgs. Their file dialogs (rfd) dlopen
+  # libdbus to reach the xdg-desktop-portal, but upstream's package.nix puts
+  # `dbus` -- whose `out` output has no libraries -- on the RPATH, so the
+  # dialog never opens. `dbus.lib` is where libdbus-1.so actually lives.
+  artcraft = import "${inputs.artcraft}/default.nix" { inherit pkgs; };
+  artcraftApps = map
+    (app: artcraft.${app}.overrideAttrs (old: {
+      runtimeDependencies = old.runtimeDependencies ++ [ pkgs.dbus.lib ];
+    }))
+    [
+      "vectorcraft"
+      "photocraft"
+      "pdfcraft"
+      "designcraft"
+    ];
+in
 {
+  imports = [ inputs.artcraft.nixosModules.default ];
+
   # Bootloader.
   boot = {
     loader.systemd-boot.enable = true;
@@ -309,16 +328,27 @@
     noto-fonts-color-emoji
   ];
 
+  # The ArtCraft module, for its /usr/share/fonts link to the system fonts: the
+  # apps' text tools look only there, not through fontconfig. The apps
+  # themselves are `artcraftApps` above, installed below.
+  programs.artcraft = {
+    enable = true;
+    apps = [ ];
+  };
+
   # List packages installed in system profile. To search, run:
   # $ nix search wget
-  environment.systemPackages = with pkgs; [
-    vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
-    wget
-    curl
-    neovim
-    git
-    pam_u2f # provides `pamu2fcfg`, used to enroll a YubiKey below
-  ];
+  environment.systemPackages =
+    with pkgs;
+    [
+      vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
+      wget
+      curl
+      neovim
+      git
+      pam_u2f # provides `pamu2fcfg`, used to enroll a YubiKey below
+    ]
+    ++ artcraftApps;
 
   # YubiKey for sudo + GUI polkit prompts only (not GDM login).
   # control = "sufficient" (this is NixOS's own default -- restated here so it's

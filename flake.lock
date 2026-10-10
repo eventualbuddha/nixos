@@ -1,5 +1,25 @@
 {
   "nodes": {
+    "artcraft": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1791629013,
+        "narHash": "sha256-lTpDfk2PNaeHYF6izChcH5kYfXr0J5knECVlZNp2Rt0=",
+        "owner": "ipeglin",
+        "repo": "artcraft-nix",
+        "rev": "8c81642d8e263fa0e0087044801e6d58d3807036",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ipeglin",
+        "repo": "artcraft-nix",
+        "type": "github"
+      }
+    },
     "home-manager": {
       "inputs": {
         "nixpkgs": [
@@ -182,6 +202,7 @@
     },
     "root": {
       "inputs": {
+        "artcraft": "artcraft",
         "home-manager": "home-manager",
         "lazyvim-starter": "lazyvim-starter",
         "niri": "niri",
