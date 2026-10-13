@@ -921,6 +921,39 @@ READ_ONLY_HOSTS = {"api.mason-registry.dev", "downloads.claude.ai", "herdr.dev",
                    # opened by this; see NOTES 57 for what stays shut.
                    "update.code.visualstudio.com",
                    "vscode.download.prss.microsoft.com",
+                   #
+                   # Electron (NOTES 58), opened on request. The www host is the docs site
+                   # (/docs/latest/, the same doc-site shape as oxc.rs) and the Node-headers
+                   # front for native-module rebuilds: node-gyp via @electron/rebuild fetches
+                   # /headers/v<ver>/node-v<ver>-headers.tar.gz (+ SHASUMS256.txt) there, which
+                   # 302s to the artifacts host — the same redirect-target pair as
+                   # update.code.visualstudio.com above, so both are listed. The Electron binary
+                   # itself is NOT fetched from either: @electron/get pulls the zip and
+                   # SHASUMS256.txt from github.com/electron/electron/releases/download/, which
+                   # 302s to release-assets.githubusercontent.com — both open above. The bare
+                   # apex electronjs.org (301 to www) is not listed.
+                   "www.electronjs.org",
+                   "artifacts.electronjs.org",
+                   #
+                   # Yarn (NOTES 59), opened on request. registry.yarnpkg.com is Yarn's mirror of
+                   # the npm registry: Yarn 1 lockfiles pin every `resolved` URL to it, Berry's
+                   # npmRegistryServer defaults to it, and corepack fetches Yarn 1 itself from
+                   # /yarn/-/yarn-<ver>.tgz there. Same read-only treatment as registry.npmjs.org
+                   # above, and the same audit-POST exception (READ_ONLY_POST_PATHS). repo.yarnpkg.com
+                   # serves the Berry bundle (/<ver>/packages/yarnpkg-cli/bin/yarn.js) and the
+                   # /tags index that corepack (yarn >=2) and `yarn set version` read — that admits
+                   # an executable, like update.code.visualstudio.com above. yarnpkg.com (docs)
+                   # and classic.yarnpkg.com (302s to GitHub releases, already open) are not listed.
+                   "registry.yarnpkg.com",
+                   "repo.yarnpkg.com",
+                   #
+                   # ocrs OCR models (NOTES 60), opened on request: ocrs-cli downloads
+                   # text-detection.rten and text-recognition.rten from this public bucket's
+                   # Transfer Acceleration endpoint. One exact bucket host, like the design and
+                   # circleci buckets above — never an S3 wildcard, since anyone can create a
+                   # bucket and a GET to one they own lands its URL in their access logs. The
+                   # regional and bare S3 names for the same bucket are not listed.
+                   "ocrs-models.s3-accelerate.amazonaws.com",
                    }
 
 # The read-only hosts that cannot be listed exactly, as full-match patterns: same policy as
@@ -957,6 +990,11 @@ def _is_read_only_host(host):
 # exists to keep closed, same call as cafe.github.com's telemetry in NOTES 30.
 READ_ONLY_POST_PATHS = {
     "registry.npmjs.org":       {"/-/npm/v1/security/advisories/bulk"},  # npm audit
+    # yarn audit on the npm mirror (NOTES 59): Berry's `yarn npm audit` POSTs the same bulk
+    # endpoint; Yarn 1's `yarn audit` POSTs the older full-tree /audits one. Same body shape and
+    # cost as the npm entry above — a lockfile-shaped JSON body to a fixed path — revoke the same way.
+    "registry.yarnpkg.com":     {"/-/npm/v1/security/advisories/bulk",
+                                 "/-/npm/v1/security/audits"},
     "api.osv.dev":              {"/v1/querybatch"},                      # osv-scanner batch query
 }
 

@@ -1657,6 +1657,86 @@ needs doing, and how to back everything out.
       path allowed; the four not-opened hosts pinned denied.
     - Deploy: `./apply.sh` on `work`, then on `judy`.
 
+58. **Electron opened read-only: `www.electronjs.org` + `artifacts.electronjs.org` (2026-10-08,
+    on request).** Asked for directly, not pulled from the deny log: the docs host first, then
+    "whatever is needed to download Electron binaries". Traced from the host:
+    - **The binary itself needs nothing new.** `npm install electron` runs `@electron/get`,
+      which fetches `electron-v<ver>-<os>-<arch>.zip` and `SHASUMS256.txt` from
+      `github.com/electron/electron/releases/download/v<ver>/`, a 302 to
+      `release-assets.githubusercontent.com`. Both have been open since item 13 (github.com
+      release assets) and the release-assets CDN entry. Tests now pin that chain so it cannot
+      regress silently. (`ELECTRON_MIRROR` could point elsewhere; it is unset, so the default
+      GitHub path is what the guest uses.)
+    - **Native-module rebuilds need one more host.** `@electron/rebuild` / node-gyp fetch the
+      Node headers for the Electron ABI from `www.electronjs.org/headers/v<ver>/
+      node-v<ver>-headers.tar.gz` (+ `SHASUMS256.txt`), which 302s to
+      `artifacts.electronjs.org/headers/dist/v<ver>/…`. That is the item-57 redirect-target
+      pair shape, same answer: both in `READ_ONLY_HOSTS`, GET/HEAD only, no credentials
+      injected, writes denied. The artifacts host serves C headers tarballs, not executables.
+    - **The www host is also the docs site** (`/docs/latest/`), the item-31 doc-site shape,
+      oxc.rs (item 56) treatment. It answers 200 directly for docs; only `/headers/` redirects.
+    - The bare apex `electronjs.org` 301s to www and is not listed; a guest hitting the apex
+      gets denied and should use the www name. Nothing else under `*.electronjs.org` is
+      reachable until it shows up in the deny log with a reason.
+    - Tests +14: docs GET allowed on www, POST denied, no headers injected, apex pinned denied;
+      headers front path and SHASUMS allowed on www; artifacts GET allowed, POST denied, no
+      headers injected; the GitHub zip + SHASUMS and the release-assets hop allowed with no
+      credentials injected.
+    - Deploy: `./apply.sh` on `work`, then on `judy`.
+
+59. **Yarn opened read-only: `registry.yarnpkg.com` (+ audit POSTs) and `repo.yarnpkg.com`
+    (2026-10-08, on request).** Asked for as "the yarn registry hosts", not pulled from the deny
+    log. Traced from the host and from corepack's `config.json`:
+    - **`registry.yarnpkg.com`** is Yarn's mirror of the npm registry. Yarn 1 lockfiles pin every
+      `resolved` URL to it, so a `yarn install` in a Yarn 1 project never touches
+      `registry.npmjs.org` (open since item 13) and was 403ing wholesale. Berry's
+      `npmRegistryServer` defaults to it too, and corepack fetches Yarn 1 itself from
+      `/yarn/-/yarn-1.22.22.tgz` there. Same treatment as the npm registry: `READ_ONLY_HOSTS`,
+      GET/HEAD, no credentials injected, publish (PUT) and every other write denied.
+    - **Audit POSTs, mirrored from the npm entry (item 31):** `READ_ONLY_POST_PATHS` gets
+      `/-/npm/v1/security/advisories/bulk` (Berry `yarn npm audit`) and
+      `/-/npm/v1/security/audits` (Yarn 1 `yarn audit`, the older full-tree endpoint). Both
+      answer 200 to POST from the host. Same honest cost as item 31 — a lockfile-shaped JSON
+      body to a fixed path on a known host, not inspected — and the same revocation: delete the
+      entry and the host drops back to GET/HEAD-only. If audits are not wanted here, that is
+      the line to cut.
+    - **`repo.yarnpkg.com`** serves the Berry bundle, `/<ver>/packages/yarnpkg-cli/bin/yarn.js`,
+      plus the `/tags` version index. That is what corepack uses for `yarn >= 2.0.0` and what
+      `yarn set version` fetches, so a Berry project cannot start without it. **This admits an
+      executable** (a JS bundle the guest then runs), like `update.code.visualstudio.com`
+      (item 57) — corepack checks it against the `packageManager` hash in the project, and it
+      runs as the user either way. The host answers 404 to HEAD and 200/206 to GET; the gate
+      allows both methods, the client uses GET.
+    - **Not opened:** `yarnpkg.com` (docs; not asked for) and `classic.yarnpkg.com`
+      (`/latest.tar.gz` 302s to `github.com/yarnpkg/yarn/releases/download/…`, which is open
+      already, so the redirector adds nothing). Both pinned denied.
+    - Exact hosts, as always: nothing else under `*.yarnpkg.com` is reachable until it shows up
+      in the deny log with a reason.
+    - Tests +18: registry GETs (unscoped, scoped, tarball, Yarn 1 tgz) allowed with no headers
+      injected; both audit POSTs allowed, other POST/PUT/prefix denied, the Yarn 1 path not
+      cross-granted to `registry.npmjs.org`; repo bundle + `/tags` GET allowed, POST denied, no
+      headers injected; docs and classic hosts pinned denied.
+    - Deploy: `./apply.sh` on `work`, then on `judy`.
+
+60. **ocrs OCR models opened read-only: `ocrs-models.s3-accelerate.amazonaws.com` (2026-10-10,
+    on request).** `ocrs-cli` fetches `text-detection.rten` and `text-recognition.rten` from this
+    public bucket via its S3 Transfer Acceleration endpoint. Checked from the host: both answer
+    200 directly (`server: AmazonS3`, no redirect, ~2.5 MB and ~9.7 MB), and `/` answers 403, so
+    the bucket does not list. `READ_ONLY_HOSTS`, GET/HEAD, no credentials injected, writes denied.
+    - **Also asked about opening S3 hosts more generally — not done.** Same answer as item 30,
+      and it holds even for a GET-only tier: anyone can create a bucket, and a GET to a bucket
+      the attacker owns lands the full URL (path + query, i.e. whatever the guest encodes there)
+      in that bucket's server access logs / CloudTrail data events. A `*.s3*.amazonaws.com`
+      entry would be a general exfil channel that looks like downloads. Vendor read-only hosts
+      don't have this problem because the guest can't pick who owns them. So buckets stay one
+      exact host at a time, like `vxdesign-staging` (item 30) and `circleci-tasks-prod` (item 51).
+    - Exact name only: the same bucket as `ocrs-models.s3.amazonaws.com` (virtual-hosted,
+      non-accelerated) and path-style `s3-accelerate.amazonaws.com/ocrs-models/…` are not
+      listed; neither is any other accelerate bucket. All pinned denied.
+    - Tests +8: both model GET/HEAD allowed, PUT/POST denied, no headers injected; the plain-S3
+      name, path-style accelerate, and another accelerate bucket pinned denied.
+    - Deploy: `./apply.sh` on `work`, then on `judy`.
+
 ## Running it: `Justfile` (RETIRED)
 
 > **THE JUSTFILE IS GONE, DELETED IN THE NIXOS PORT (2026-08-28).** This section, and the two

@@ -1034,6 +1034,63 @@ check("ro57/vscode_cdn_shut",         gh("/extensions/marketplace.json", "GET", 
 check("ro57/vscode_exptas_shut",      gh("/vscode/ab", "GET", host="default.exp-tas.com"), "deny")
 check("ro57/vscode_telemetry_shut",   gh("/OneCollector/1.0", "POST", host="mobile.events.data.microsoft.com"), "deny")
 
+# ---- Electron (NOTES 58): docs + Node headers on www, headers 302 to artifacts; binary via GitHub ----
+check("ro58/electron_docs",     gh("/docs/latest/api/browser-window", "GET", host="www.electronjs.org"), "allow")
+check("ro58/electron_root",     gh("/", "GET", host="www.electronjs.org"), "allow")
+check("ro58/electron_post",     gh("/docs/latest/api/browser-window", "POST", host="www.electronjs.org"), "deny")
+check("ro58/electron_no_creds", hdrs("/docs/latest/api/browser-window", "GET", "www.electronjs.org"), {})
+check("ro58/electron_apex_shut", gh("/docs/latest/", "GET", host="electronjs.org"), "deny")
+# node-gyp headers: www front, 302 to artifacts
+_EL_HDR = "/headers/v44.7.0/node-v44.7.0-headers.tar.gz"
+_EL_HDR_CDN = "/headers/dist/v44.7.0/node-v44.7.0-headers.tar.gz"
+check("ro58/electron_headers_front",    gh(_EL_HDR, "GET", host="www.electronjs.org"), "allow")
+check("ro58/electron_headers_shasums",  gh("/headers/v44.7.0/SHASUMS256.txt", "GET", host="www.electronjs.org"), "allow")
+check("ro58/electron_artifacts_get",    gh(_EL_HDR_CDN, "GET", host="artifacts.electronjs.org"), "allow")
+check("ro58/electron_artifacts_post",   gh(_EL_HDR_CDN, "POST", host="artifacts.electronjs.org"), "deny")
+check("ro58/electron_artifacts_no_creds", hdrs(_EL_HDR_CDN, "GET", "artifacts.electronjs.org"), {})
+# the binary itself: @electron/get -> github.com release asset -> release-assets CDN (both already open)
+_EL_ZIP = "/electron/electron/releases/download/v44.7.0/electron-v44.7.0-linux-x64.zip"
+check("ro58/electron_zip_github",   gh(_EL_ZIP), "allow")
+check("ro58/electron_sums_github",  gh("/electron/electron/releases/download/v44.7.0/SHASUMS256.txt"), "allow")
+check("ro58/electron_zip_cdn",      gh("/github-production-release-asset/9384267/4c5959fd-561c-4cdc-9996-bea19575fd9a", "GET", host="release-assets.githubusercontent.com"), "allow")
+check("ro58/electron_zip_cdn_no_creds", hdrs("/github-production-release-asset/9384267/4c5959fd-561c-4cdc-9996-bea19575fd9a", "GET", "release-assets.githubusercontent.com"), {})
+
+# ---- Yarn (NOTES 59): registry.yarnpkg.com = npm mirror (+ audit POSTs); repo.yarnpkg.com = Berry bundles ----
+check("ro59/yarn_reg_meta",     gh("/electron", "GET", host="registry.yarnpkg.com"), "allow")
+check("ro59/yarn_reg_tgz",      gh("/electron/-/electron-44.7.0.tgz", "GET", host="registry.yarnpkg.com"), "allow")
+check("ro59/yarn_reg_scoped",   gh("/@yarnpkg/cli-dist", "GET", host="registry.yarnpkg.com"), "allow")
+check("ro59/yarn_reg_yarn1_tgz", gh("/yarn/-/yarn-1.22.22.tgz", "GET", host="registry.yarnpkg.com"), "allow")
+check("ro59/yarn_reg_no_creds", hdrs("/electron", "GET", "registry.yarnpkg.com"), {})
+# audit POSTs: Berry's bulk endpoint and Yarn 1's /audits, exact paths, nothing else
+check("ro59/yarn_audit_bulk",   gh("/-/npm/v1/security/advisories/bulk", "POST", host="registry.yarnpkg.com"), "allow")
+check("ro59/yarn_audit_v1",     gh("/-/npm/v1/security/audits", "POST", host="registry.yarnpkg.com"), "allow")
+check("ro59/yarn_audit_no_creds", hdrs("/-/npm/v1/security/advisories/bulk", "POST", "registry.yarnpkg.com"), {})
+check("ro59/yarn_other_post",   gh("/-/npm/v1/user", "POST", host="registry.yarnpkg.com"), "deny")
+check("ro59/yarn_publish_put",  gh("/some-package", "PUT", host="registry.yarnpkg.com"), "deny")
+check("ro59/yarn_audit_prefix", gh("/-/npm/v1/security/audits/x", "POST", host="registry.yarnpkg.com"), "deny")
+check("ro59/yarn_audit_cross",  gh("/-/npm/v1/security/audits", "POST", host="registry.npmjs.org"), "deny")
+# Berry bundle host
+_YARN_JS = "/4.18.1/packages/yarnpkg-cli/bin/yarn.js"
+check("ro59/yarn_repo_bundle",  gh(_YARN_JS, "GET", host="repo.yarnpkg.com"), "allow")
+check("ro59/yarn_repo_tags",    gh("/tags", "GET", host="repo.yarnpkg.com"), "allow")
+check("ro59/yarn_repo_post",    gh(_YARN_JS, "POST", host="repo.yarnpkg.com"), "deny")
+check("ro59/yarn_repo_no_creds", hdrs(_YARN_JS, "GET", "repo.yarnpkg.com"), {})
+# not opened: the docs site and the classic redirector (its target, GitHub releases, is open anyway)
+check("ro59/yarn_docs_shut",    gh("/", "GET", host="yarnpkg.com"), "deny")
+check("ro59/yarn_classic_shut", gh("/latest.tar.gz", "GET", host="classic.yarnpkg.com"), "deny")
+
+# ---- ocrs models (NOTES 60): one exact accelerate-endpoint bucket host, no S3 wildcard ----
+_OCRS = "ocrs-models.s3-accelerate.amazonaws.com"
+check("ro60/ocrs_detect",       gh("/text-detection.rten", "GET", host=_OCRS), "allow")
+check("ro60/ocrs_recog_head",   gh("/text-recognition.rten", "HEAD", host=_OCRS), "allow")
+check("ro60/ocrs_put",          gh("/text-detection.rten", "PUT", host=_OCRS), "deny")
+check("ro60/ocrs_post",         gh("/", "POST", host=_OCRS), "deny")
+check("ro60/ocrs_no_creds",     hdrs("/text-detection.rten", "GET", _OCRS), {})
+# the same bucket under other S3 names, other accelerate buckets, and the bare endpoint stay shut
+check("ro60/ocrs_plain_s3",     gh("/text-detection.rten", "GET", host="ocrs-models.s3.amazonaws.com"), "deny")
+check("ro60/ocrs_path_style",   gh("/ocrs-models/text-detection.rten", "GET", host="s3-accelerate.amazonaws.com"), "deny")
+check("ro60/other_accel_bucket", gh("/x", "GET", host="evil.s3-accelerate.amazonaws.com"), "deny")
+
 try:
     os.remove(os.environ["VMGUARD_DENYLOG"])
 except OSError:
