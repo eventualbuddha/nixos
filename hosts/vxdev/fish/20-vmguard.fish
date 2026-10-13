@@ -29,5 +29,9 @@ set -gx no_proxy localhost,127.0.0.1,::1
 # environment. See READ_ONLY_HOSTS in modules/vmguard/egress_filter.py, which
 # calls this out for downloads.claude.ai.
 set -gx NODE_EXTRA_CA_CERTS /etc/ssl/certs/ca-certificates.crt
+# Python's requests is another: it verifies against certifi's bundled roots, not
+# the system store, so poetry (and anything else built on requests) fails with
+# "unknown ca" against pypi.org. requests and pip both honor this variable.
+set -gx REQUESTS_CA_BUNDLE /etc/ssl/certs/ca-certificates.crt
 
 set -gx GIT_TERMINAL_PROMPT 0
