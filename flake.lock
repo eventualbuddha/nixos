@@ -187,11 +187,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1791911849,
-        "narHash": "sha256-6bQt235OcE0jls3DuI43ovDjUVpY5nlYnEkjXysM1QQ=",
+        "lastModified": 1791927847,
+        "narHash": "sha256-f/APSlDuSWZ8kSptZ0izxX5QU6SYVx93Vyfx674ZfpM=",
         "owner": "eventualbuddha",
         "repo": "proj",
-        "rev": "a05b1875ccaa7648a0fe34770d13a795bee06564",
+        "rev": "ae49fb83ff41e78f50e11d4b23eaf2a6393e84e9",
         "type": "github"
       },
       "original": {
