@@ -253,7 +253,28 @@
     # hm-session-vars and nothing else -- no prompt, no completions, no direnv,
     # no zoxide -- while non-login interactive shells get all of it, which is a
     # confusing split to debug. This restores what Debian did.
+    #
+    # The PATH block before it is for login shells started *from* fish -- which
+    # is every `ssh vx '<cmd>'`, since fish is the login shell and runs the
+    # command string. fish exports __ETC_PROFILE_NIX_SOURCED and
+    # __HM_SESS_VARS_SOURCED, then Debian's /etc/profile resets PATH
+    # unconditionally, and both scripts see their guard and return without
+    # putting anything back. The result is a `sh -lc` with neither nix nor
+    # ~/.local/bin on PATH, which is what broke T3 Code's remote provider check
+    # (`sh -lc "command -v claude"`). The nix profile missing from PATH is the
+    # tell that this happened, so only then are the guards cleared and both
+    # re-sourced: nix first, so hm's sessionPath lands ahead of it.
     profileExtra = ''
+      case ":$PATH:" in
+        *":$HOME/.nix-profile/bin:"*) ;;
+        *)
+          unset __ETC_PROFILE_NIX_SOURCED __HM_SESS_VARS_SOURCED
+          [ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ] \
+            && . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+          . "${config.home.profileDirectory}/etc/profile.d/hm-session-vars.sh"
+          ;;
+      esac
+
       if [ -n "$BASH_VERSION" ] && [ -f "$HOME/.bashrc" ]; then
         . "$HOME/.bashrc"
       fi
