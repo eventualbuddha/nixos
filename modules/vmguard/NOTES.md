@@ -1737,6 +1737,20 @@ needs doing, and how to back everything out.
       name, path-style accelerate, and another accelerate bucket pinned denied.
     - Deploy: `./apply.sh` on `work`, then on `judy`.
 
+61. **`deb.nodesource.com` opened read-only (2026-10-19, on request).** The ask was
+    `https://deb.nodesource.com/setup_26.x`, NodeSource's apt-repo bootstrap for Node 26.
+    Checked from the host: the script fetches `/gpgkey/nodesource-repo.gpg.key` and writes a
+    sources entry for `/node_26.x`, all on the same host, so one exact entry covers the whole
+    install. It sits beside `apt.postgresql.org` and `cli.github.com` in `READ_ONLY_HOSTS`:
+    GET/HEAD only, no credentials injected, writes denied.
+    - **This admits an executable** (the `nodejs` .deb, and the setup script itself if piped to
+      a shell). Integrity is apt's gpg signature against the NodeSource key, the same story as
+      the other extra apt repos; the script's own bytes are trusted only by TLS to the host.
+    - Exact host: `rpm.nodesource.com` and the rest of `*.nodesource.com` stay denied.
+    - Tests +6: setup script, gpg key, and repo `InRelease` GET allowed, POST denied, no
+      headers injected, `rpm.nodesource.com` pinned denied.
+    - Deploy: `./apply.sh` on `work`, then on `judy`.
+
 ## Running it: `Justfile` (RETIRED)
 
 > **THE JUSTFILE IS GONE, DELETED IN THE NIXOS PORT (2026-08-28).** This section, and the two

@@ -1091,6 +1091,14 @@ check("ro60/ocrs_plain_s3",     gh("/text-detection.rten", "GET", host="ocrs-mod
 check("ro60/ocrs_path_style",   gh("/ocrs-models/text-detection.rten", "GET", host="s3-accelerate.amazonaws.com"), "deny")
 check("ro60/other_accel_bucket", gh("/x", "GET", host="evil.s3-accelerate.amazonaws.com"), "deny")
 
+# ---- NodeSource apt repo (NOTES 61): setup script, signing key, and repo, one host, read-only ----
+check("ro61/nodesource_setup",    gh("/setup_26.x", "GET", host="deb.nodesource.com"), "allow")
+check("ro61/nodesource_key",      gh("/gpgkey/nodesource-repo.gpg.key", "GET", host="deb.nodesource.com"), "allow")
+check("ro61/nodesource_release",  gh("/node_26.x/dists/nodistro/InRelease", "GET", host="deb.nodesource.com"), "allow")
+check("ro61/nodesource_post",     gh("/setup_26.x", "POST", host="deb.nodesource.com"), "deny")
+check("ro61/nodesource_no_creds", hdrs("/setup_26.x", "GET", "deb.nodesource.com"), {})
+check("ro61/nodesource_rpm_shut", gh("/", "GET", host="rpm.nodesource.com"), "deny")
+
 try:
     os.remove(os.environ["VMGUARD_DENYLOG"])
 except OSError:

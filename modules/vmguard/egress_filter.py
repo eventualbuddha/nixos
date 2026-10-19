@@ -697,6 +697,10 @@ READ_ONLY_HOSTS = {"api.mason-registry.dev", "downloads.claude.ai", "herdr.dev",
                    # InRelease and a pool listing — so it needs no companion entry.
                    "http.us.debian.org",
                    "apt.postgresql.org", "cli.github.com",     # extra apt repos on the guest
+                   # NodeSource (NOTES 61): the setup_XX.x script, its repo signing key, and
+                   # the node_XX.x apt repo it registers are all on this one host. Integrity is
+                   # apt's own gpg sigs, as above.
+                   "deb.nodesource.com",
                    # CI. `circleci.com` itself is NOT in this tier any more — it has its own
                    # handler (section 3a) because one endpoint on it takes a credential. Its
                    # reads are unchanged: GET/HEAD, no creds, exactly as this tier would give.
