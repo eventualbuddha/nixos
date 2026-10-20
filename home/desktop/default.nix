@@ -16,5 +16,6 @@ _:
     ./tunnels.nix
     ./vx-files.nix
     ./helium.nix
+    ./t3code.nix
   ];
 }

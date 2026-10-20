@@ -104,6 +104,19 @@ in
   virtualisation.libvirtd.enable = true;
   programs.virt-manager.enable = true;
 
+  # No libvirt SSH proxy (`ssh qemu/<domain>` over vsock). Nothing here uses
+  # it, since the guests are reached by address (`Host vx`, `Host debian13`),
+  # and the `Include` it adds to /etc/ssh/ssh_config breaks ssh inside
+  # appimage-run's sandbox (see programs.appimage below). The sandbox runs in a
+  # user namespace where root-owned files appear to be owned by nobody, and ssh
+  # refuses an included config file with that owner: "Bad owner or permissions
+  # on .../30-libvirt-ssh-proxy.conf", and then it exits.
+  #
+  # systemd's equivalent (`ssh vsock/<cid>`, `ssh machine/<name>`) adds an
+  # Include of its own and breaks ssh the same way. It is unused here too.
+  virtualisation.libvirtd.sshProxy = false;
+  programs.ssh.systemd-ssh-proxy.enable = false;
+
   # virtiofsd, for `<filesystem><driver type='virtiofs'/>` shares -- the vxsuite
   # VM mounts ~/code/vxsuite and ~/code/election-definitions that way. libvirt
   # looks for the vhost-user backend's JSON descriptor in a fixed set of
@@ -334,6 +347,36 @@ in
   programs.artcraft = {
     enable = true;
     apps = [ ];
+  };
+
+  # Run AppImages directly: binfmt hands any AppImage that gets exec'd to
+  # appimage-run. home/desktop/t3code.nix is why. T3 Code updates itself by
+  # replacing its own AppImage file, then relaunches it with a plain exec, and
+  # the URL-handler .desktop entry it writes for itself does the same. Without
+  # binfmt, both of those are an ELF that cannot find its loader on NixOS.
+  #
+  # One change from stock appimage-run: its bubblewrap sandbox builds a fresh
+  # /etc and symlinks in only nixpkgs' list of host entries, and /etc/ssh is
+  # not on that list. So anything an AppImage runs `ssh` for silently loses
+  # every alias in programs.ssh.extraConfig. T3's SSH environments reported
+  # "Could not resolve hostname vx" because of this. The symlink goes to
+  # /.host-etc, where the sandbox already mounts the real /etc read-only, the
+  # same way nixpkgs links in the rest. ssh_config's own symlinks into
+  # /etc/static resolve because /etc/static is on that list. It also depends
+  # on virtualisation.libvirtd.sshProxy being off; see above.
+  programs.appimage = {
+    enable = true;
+    binfmt = true;
+    package = pkgs.appimage-run.override {
+      buildFHSEnv =
+        args:
+        pkgs.buildFHSEnv (
+          args
+          // {
+            extraBwrapArgs = (args.extraBwrapArgs or [ ]) ++ [ "--symlink /.host-etc/ssh /etc/ssh" ];
+          }
+        );
+    };
   };
 
   # List packages installed in system profile. To search, run:
