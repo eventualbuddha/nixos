@@ -1751,6 +1751,24 @@ needs doing, and how to back everything out.
       headers injected, `rpm.nodesource.com` pinned denied.
     - Deploy: `./apply.sh` on `work`, then on `judy`.
 
+62. **Comment edits opened on api.github.com (2026-10-20, on request).** The deny log showed six
+    `PATCH /repos/votingworks/arlo/pulls/comments/{id}` in three seconds — a client revising its
+    own inline review comments. Inside WRITE_ORGS, so the "a tool is actually broken" class.
+    - **`PATCH /repos/{o}/{r}/(issues|pulls)/comments/{id}`** → `COMMENT_EDIT_RE`. Both forms in
+      one rule: `/issues` is REST parity for the long-allowed `updateIssueComment`, and `/pulls`
+      (review comments) is the same body text the guest can already post via `REPLY_WRITE_RE`
+      / `addPullRequestReviewThreadReply`. Editing rewrites what it could have written.
+    - **`updatePullRequestReviewComment`** in `MUTATION_ALLOW`, with a new
+      `PullRequestReviewComment` fragment in `_RESOLVE_Q` (without it the op would be allowlisted
+      and then denied as "no resolvable target org", the item-38 trap).
+    - PATCH only. Deleting a review comment (REST `DELETE /pulls/comments/{id}` and
+      `deletePullRequestReviewComment`) stays denied, as item 49 left it.
+    - Tests +20: allow/deny per org and case-folding, `%2f` traversal, non-numeric id, subpaths
+      and neighbouring endpoints (`/issues/{n}`, `/pulls/{n}/comments`) pinned denied, other
+      methods denied, both GraphQL edit ops, the resolver fragment, and review-comment delete
+      still denied.
+    - Deploy: `./apply.sh` on `work`, then on `judy`.
+
 ## Running it: `Justfile` (RETIRED)
 
 > **THE JUSTFILE IS GONE, DELETED IN THE NIXOS PORT (2026-08-28).** This section, and the two

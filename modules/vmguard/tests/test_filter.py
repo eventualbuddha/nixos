@@ -227,7 +227,7 @@ check("resolve/review_thread", resolve([{"__typename": "PullRequestReviewThread"
 # ...which only works because _RESOLVE_Q asks for the field. Guard the pairing: every typename
 # an allowed mutation can target needs a fragment, or it fails closed at the org check.
 for _t in ("Repository", "PullRequest", "Issue", "IssueComment", "PullRequestReviewThread",
-           "PullRequestReview", "Milestone", "Discussion", "Label"):
+           "PullRequestReview", "PullRequestReviewComment", "Milestone", "Discussion", "Label"):
     check(f"resolve/q_has_{_t}", f"... on {_t}{{" in gf._RESOLVE_Q, True)
 # Projects are deliberately absent: no `repository` field, so they don't fit this resolver (NOTES 41)
 for _t in ("Project", "ProjectV2"):
@@ -958,6 +958,38 @@ check("delcomment/gql", decide("mutation{deleteIssueComment(input:$i){clientMuta
 check("delcomment/gql_forbidden_org",
       decide("mutation{deleteIssueComment(input:$i){clientMutationId}}",
              {"input": {"id": "IC_9"}}, {"torvalds"}), "deny")
+
+# ---- comment edit (REST), NOTES 62: issue/PR conversation and review comments, org-gated ----
+check("editcomment/review",        gh("/repos/votingworks/arlo/pulls/comments/4330541743", "PATCH", host=API), "allow")
+check("editcomment/issue",         gh("/repos/votingworks/vxsuite/issues/comments/5195760611", "PATCH", host=API), "allow")
+check("editcomment/other_org",     gh("/repos/eventualbuddha/dotfiles/pulls/comments/7", "PATCH", host=API), "allow")
+check("editcomment/org_case",      gh("/repos/VotingWorks/vxsuite/issues/comments/7", "PATCH", host=API), "allow")
+check("editcomment/forbidden_org", gh("/repos/torvalds/linux/pulls/comments/7", "PATCH", host=API), "deny")
+check("editcomment/forbidden_org_issue", gh("/repos/torvalds/linux/issues/comments/7", "PATCH", host=API), "deny")
+check("editcomment/pct_traversal",
+      gh("/repos/votingworks/vxsuite%2f..%2f..%2ftorvalds%2flinux/pulls/comments/7", "PATCH", host=API), "deny")
+check("editcomment/nonnumeric",    gh("/repos/votingworks/vxsuite/pulls/comments/abc", "PATCH", host=API), "deny")
+check("editcomment/subpath",       gh("/repos/votingworks/vxsuite/pulls/comments/7/reactions", "PATCH", host=API), "deny")
+check("editcomment/issue_itself",  gh("/repos/votingworks/vxsuite/issues/7", "PATCH", host=API), "deny")
+check("editcomment/pr_comments",   gh("/repos/votingworks/vxsuite/pulls/7/comments", "PATCH", host=API), "deny")
+# PATCH only: a review comment still can't be deleted, and PUT/POST on the same path stay shut
+check("editcomment/review_delete", gh("/repos/votingworks/vxsuite/pulls/comments/7", "DELETE", host=API), "deny")
+check("editcomment/put_denied",    gh("/repos/votingworks/vxsuite/pulls/comments/7", "PUT", host=API), "deny")
+check("editcomment/post_denied",   gh("/repos/votingworks/vxsuite/issues/comments/7", "POST", host=API), "deny")
+# ...and the paired GraphQL ops
+check("editcomment/gql_review", decide("mutation{updatePullRequestReviewComment(input:$i){clientMutationId}}",
+                                       {"input": {"pullRequestReviewCommentId": "PRRC_1", "body": "x"}}, {"votingworks"}), "mutation-ok")
+check("editcomment/gql_review_forbidden",
+      decide("mutation{updatePullRequestReviewComment(input:$i){clientMutationId}}",
+             {"input": {"pullRequestReviewCommentId": "PRRC_9", "body": "x"}}, {"torvalds"}), "deny")
+check("editcomment/gql_issue",  decide("mutation{updateIssueComment(input:$i){clientMutationId}}",
+                                       {"input": {"id": "IC_1", "body": "x"}}, {"votingworks"}), "mutation-ok")
+check("editcomment/resolve",    resolve([{"__typename": "PullRequestReviewComment",
+                                          "repository": {"owner": {"login": "votingworks"}}}]), {"votingworks"})
+# deleting a review comment over GraphQL is still not open either
+check("editcomment/gql_review_delete",
+      decide("mutation{deletePullRequestReviewComment(input:$i){clientMutationId}}",
+             {"input": {"id": "PRRC_1"}}, {"votingworks"}), "deny")
 
 # ---- branch rename (REST), NOTES 49: org-gated, same %2F handling as the delete rule ----
 check("rename/plain",          gh("/repos/votingworks/vxsuite/branches/main/rename", "POST", host=API), "allow")

@@ -124,6 +124,11 @@ MUTATION_ALLOW = {
     # `deletePullRequestReview` are deliberately NOT here — nothing has asked, and the deny log
     # is where that decision comes from.
     "deleteissuecomment",
+    # Edit a review comment (NOTES 62): the review-comment twin of updateIssueComment, and the
+    # GraphQL half of COMMENT_EDIT_RE below. Body text only, onto a comment the guest could
+    # already have posted via addPullRequestReviewThreadReply. Needs the PullRequestReviewComment
+    # fragment in _RESOLVE_Q, added alongside this line.
+    "updatepullrequestreviewcomment",
     "addlabelstolabelable", "removelabelsfromlabelable",
 }
 
@@ -253,6 +258,24 @@ REPLY_WRITE_RE = re.compile(
 DELETE_COMMENT_RE = re.compile(
     r"^/repos/(?P<owner>[A-Za-z0-9._-]+)/(?P<repo>[A-Za-z0-9._-]+)"
     r"/issues/comments/[0-9]+$")
+
+# Edit a comment (REST): PATCH /repos/{owner}/{repo}/issues/comments/{id} (issue and PR
+# conversation comments) and PATCH /repos/{owner}/{repo}/pulls/comments/{id} (review comments,
+# the inline ones on a diff). Six denies on the /pulls form in three seconds on 2026-10-20, a
+# client revising its own review comments in votingworks/arlo (NOTES 62).
+#
+# Transport parity plus one sibling, not a wider write boundary: `updateIssueComment` has been an
+# allowed mutation since NOTES 14, and a review comment is the same body text the guest can
+# already post via REPLY_WRITE_RE / addPullRequestReviewThreadReply — editing it rewrites what
+# it could have written. The GraphQL half is `updatePullRequestReviewComment` in MUTATION_ALLOW.
+#
+# Org-scoped off the RAW path with the same unreserved-only charset as the rules above. The id
+# is numeric and the pattern is anchored at it, so no subpath (/reactions etc.) rides along, and
+# PATCH on /issues/{n} or /pulls/{n}/comments stays where it was. DELETE on a review comment is
+# still NOT open — DELETE_COMMENT_RE is the /issues form only.
+COMMENT_EDIT_RE = re.compile(
+    r"^/repos/(?P<owner>[A-Za-z0-9._-]+)/(?P<repo>[A-Za-z0-9._-]+)"
+    r"/(?:issues|pulls)/comments/[0-9]+$")
 
 # Rename a branch (REST): POST /repos/{owner}/{repo}/branches/{branch}/rename. Ten denies in a
 # 30-second burst on 2026-09-03 — a batch tidy-up of stale branch names (NOTES 49).
@@ -507,6 +530,7 @@ _RESOLVE_Q = ("query($ids:[ID!]!){nodes(ids:$ids){__typename "
               "... on IssueComment{repository{owner{login}}} "
               "... on PullRequestReviewThread{repository{owner{login}}} "
               "... on PullRequestReview{repository{owner{login}}} "
+              "... on PullRequestReviewComment{repository{owner{login}}} "
               # Milestone and Discussion are reachable from mutations that were ALREADY allowed —
               # milestoneId on createIssue/updateIssue/updatePullRequest, and labelableId on
               # add/removeLabelsToLabelable, which accepts a Discussion. Both were latent item-38
@@ -1196,7 +1220,7 @@ def _handle_github_api(flow):
     """api.github.com: REST reads (GET/HEAD) and GraphQL reads always allowed; GraphQL
     mutations allowed only for PR/issue ops scoped to WRITE_ORGS. The REST write families
     (stacked PRs, reviewer requests, review replies, PR update/merge, branch delete/rename,
-    comment deletion) are org-gated off the URL path. PAT injected host-side. Everything
+    comment edit/deletion) are org-gated off the URL path. PAT injected host-side. Everything
     else denied."""
     m = flow.request.method
     path_only = flow.request.path.split("?", 1)[0]
@@ -1232,6 +1256,9 @@ def _handle_github_api(flow):
         mo = PR_UPDATE_RE.match(path_only)                 # retarget/edit a PR (restacking)
         if mo:
             return _path_write_decision(flow, mo, "PR update in", pr_update=True)
+        mo = COMMENT_EDIT_RE.match(path_only)              # edit one issue/PR/review comment
+        if mo:
+            return _path_write_decision(flow, mo, "comment edit in", comment_edit=True)
     if m == "PUT":
         mo = MERGE_PR_RE.match(path_only)                  # merge a PR (sync or async)
         if mo:
