@@ -22,6 +22,9 @@ in
 
   networking.hostName = "judy";
 
+  # Framework publishes BIOS/EC updates for the Laptop 12 on LVFS.
+  services.fwupd.enable = true;
+
   # The vxsuite VM runs on work, on a libvirt network only work can route to.
   # Reach it through the TCP relay work publishes on the tailnet (:2222 ->
   # guest:22, hosts/work/configuration.nix). User, agent forwarding and
