@@ -47,14 +47,14 @@ let
   # `nix store prefetch-file --json <release-url>`).
   vite-plus =
     let
-      version = "1.1.0";
+      version = "1.4.0";
     in
     pkgs.stdenvNoCC.mkDerivation {
       pname = "vite-plus";
       inherit version;
       src = pkgs.fetchurl {
         url = "https://github.com/voidzero-dev/vite-plus/releases/download/v${version}/vp-x86_64-unknown-linux-gnu.tar.gz";
-        hash = "sha256-e37+nCF7lB498pg27GmJquVMCCxzy5vn1bkTR/WbDds=";
+        hash = "sha256-mSVYq8liE4RDSiLYDgbhF2FWgPFKPheljrKH/TCgdpQ=";
       };
       sourceRoot = ".";
 
@@ -75,7 +75,7 @@ let
       installPhase = ''
         runHook preInstall
         install -Dm755 vp $out/bin/vp
-        for proxy in node npm npx corepack pnpm pnpx pn pnx yarn yarnpkg vpr vpx hunk hunkdiff; do
+        for proxy in node npm npx corepack pnpm pnpx pn pnx yarn yarnpkg bun bunx vpr vpx hunk hunkdiff; do
           ln -s vp "$out/bin/$proxy"
         done
         runHook postInstall
