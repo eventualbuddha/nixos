@@ -120,6 +120,53 @@
     }
   '';
 
+  # Python LSP via ty and ruff, without LazyVim's lang.python extra (which
+  # brings pyright, Mason installs, and venv-selector). Each server prefers the
+  # project's own .venv binary so diagnostics match the project's pinned
+  # versions, falls back to PATH, and stays detached when neither exists.
+  xdg.configFile."nvim/lua/plugins/python.lua".text = ''
+    local function find_bin(root, tool)
+      local bin = vim.fs.joinpath(root, ".venv", "bin", tool)
+      if vim.uv.fs_stat(bin) then
+        return bin
+      end
+      return vim.fn.exepath(tool) ~= "" and tool or nil
+    end
+
+    local function server(tool, extra)
+      return vim.tbl_extend("force", {
+        mason = false,
+        root_dir = function(bufnr, on_dir)
+          local root = vim.fs.root(bufnr, vim.lsp.config[tool].root_markers)
+          if root and find_bin(root, tool) then
+            on_dir(root)
+          end
+        end,
+        cmd = function(dispatchers, config)
+          local bin = find_bin(config.root_dir, tool)
+          return vim.lsp.rpc.start({ bin, "server" }, dispatchers, { cwd = config.root_dir })
+        end,
+      }, extra or {})
+    end
+
+    return {
+      {
+        "neovim/nvim-lspconfig",
+        opts = {
+          servers = {
+            ty = server("ty"),
+            ruff = server("ruff", {
+              on_attach = function(client)
+                -- Leave hover to ty
+                client.server_capabilities.hoverProvider = false
+              end,
+            }),
+          },
+        },
+      },
+    }
+  '';
+
   xdg.configFile."nvim/lua/config/keymaps.lua".text = ''
     -- Keymaps are automatically loaded on the VeryLazy event
     -- Default keymaps that are always set: https://github.com/LazyVim/LazyVim/blob/main/lua/lazyvim/config/keymaps.lua
