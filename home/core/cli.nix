@@ -77,7 +77,6 @@ in
     # nix profile in bash and needed updating by hand.
     hyperfine # benchmarking
     xh # nicer `curl` for HTTP APIs
-    tealdeer # `tldr` -- community cheatsheets for common commands
     ripunzip # parallel unzip
     tree-sitter
     tuicr # code review TUI
@@ -90,6 +89,17 @@ in
 
     brightnessctl
   ];
+
+  # `tldr` -- community cheatsheets for common commands. tealdeer's default TLS
+  # backend verifies against webpki roots compiled into the binary, so inside
+  # the vmguard VM `tldr --update` dies in the handshake with the proxy's MITM
+  # CA (same story as REQUESTS_CA_BUNDLE in hosts/vxdev/fish/20-vmguard.fish).
+  # Native roots read the system bundle, which carries that CA in the guest and
+  # is the ordinary public set everywhere else.
+  programs.tealdeer = {
+    enable = true;
+    settings.updates.tls_backend = "rustls-with-native-roots";
+  };
 
   # Per-project toolchain pinning: a project's own flake.nix/shell.nix +
   # direnv gives fully reproducible, per-directory tool versions via the Nix
