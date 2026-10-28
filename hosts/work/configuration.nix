@@ -41,10 +41,8 @@ in
   #                           it is off would silently invalidate the slot the
   #                           moment it is switched on)
   #
-  # systemd in the initrd is what makes FIDO2/TPM2 unlock possible at all; the
-  # scripted initrd cannot talk to either. Passphrase entry still works as a
-  # fallback whenever no token is present.
-  boot.initrd.systemd.enable = true;
+  # The systemd initrd is what makes FIDO2/TPM2 unlock possible. Passphrase
+  # entry still works as a fallback whenever no token is present.
   boot.initrd.luks.devices."cryptroot" = {
     device = "/dev/disk/by-partlabel/cryptroot";
     # Pass TRIM through to the SSD. This leaks which blocks are unused to an

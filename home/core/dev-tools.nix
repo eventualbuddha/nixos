@@ -22,7 +22,8 @@
     # they shadowed the nix profile in bash and had to be updated by hand.
     cargo-binstall
     cargo-hack
-    cargo-llvm-cov
+    # Its test suite fails in the nix sandbox.
+    (cargo-llvm-cov.overrideAttrs { doCheck = false; })
     wasm-pack
 
     # go, replacing the copy proto used to provide. proto managed go, node and
