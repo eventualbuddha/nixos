@@ -57,6 +57,14 @@
 
   programs.home-manager.enable = true;
 
+  # User services don't read /etc/profile.d/vmguard.sh, so the proxy that is
+  # the guest's only route out has to be given to moshi-hook explicitly.
+  systemd.user.services.moshi-hook.Service.Environment = [
+    "HTTP_PROXY=http://192.168.124.1:8080"
+    "HTTPS_PROXY=http://192.168.124.1:8080"
+    "NO_PROXY=localhost,127.0.0.1,::1"
+  ];
+
   # Make the nix fish the login shell.
   #
   # On judy and work this is one line of NixOS (`users.users.brian.shell`), but
