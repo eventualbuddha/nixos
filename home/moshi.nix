@@ -65,4 +65,24 @@
         || true
     fi
   '';
+
+  # Declared here rather than via `moshi-hook service install`, whose unit pins
+  # PATH to /usr/local/bin:/usr/bin:/bin -- empty on NixOS. Runs the
+  # self-updated binary, so restart the unit after `moshi-hook update`.
+  systemd.user.services.moshi-hook = {
+    Unit = {
+      Description = "moshi-hook daemon (agent hook bridge to Moshi)";
+      After = [ "network-online.target" ];
+    };
+    Service = {
+      ExecStart = "${config.home.homeDirectory}/.local/bin/moshi-hook serve";
+      Restart = "on-failure";
+      RestartSec = 5;
+      Environment = [
+        "PATH=${config.home.homeDirectory}/.local/bin:${config.home.profileDirectory}/bin:/run/current-system/sw/bin:/usr/local/bin:/usr/bin:/bin"
+      ];
+      WorkingDirectory = "%h";
+    };
+    Install.WantedBy = [ "default.target" ];
+  };
 }
