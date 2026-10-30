@@ -90,6 +90,10 @@ in
     brightnessctl
   ];
 
+  # Shared by every host: a `herdr --remote` attach takes its keybindings and
+  # sidebar layout from the local config, not the server's.
+  xdg.configFile."herdr/config.toml".source = ./herdr.toml;
+
   # `tldr` -- community cheatsheets for common commands. tealdeer's default TLS
   # backend verifies against webpki roots compiled into the binary, so inside
   # the vmguard VM `tldr --update` dies in the handshake with the proxy's MITM

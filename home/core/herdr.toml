@@ -1,0 +1,37 @@
+onboarding = false
+
+[ui.toast]
+delivery = "herdr"
+
+[theme]
+name = "dracula"
+auto_switch = false
+
+[ui]
+agent_panel_sort = "spaces"
+
+# Tokens reported by proj's herdr plugin on vxdev. Sidebar layouts and keys
+# come from the attaching client's config, so judy needs these too.
+[ui.sidebar.spaces]
+rows = [
+  ["state_icon", "workspace"],
+  [
+    "$pr",
+    { token = "$checks", rules = [{ equals = "failing", fg = "#ff5555", bold = true }, { equals = "passing", fg = "#50fa7b" }, { equals = "pending", fg = "#f1fa8c" }] },
+    { token = "$review", rules = [{ equals = "changes", fg = "#ff5555" }, { equals = "approved", fg = "#50fa7b" }] },
+    "$stack",
+  ],
+  ["branch", "git_status", { token = "$local", fg = "#ffb86c" }],
+]
+
+[ui.sidebar.agents]
+rows = [
+  ["state_icon", "agent", "state_text"],
+  [{ token = "$project", dim = true }, "terminal_title_stripped"],
+]
+
+[[keys.command]]
+key = "prefix+d"
+type = "plugin_action"
+command = "proj.dashboard"
+description = "proj dashboard"

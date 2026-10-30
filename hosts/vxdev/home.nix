@@ -312,6 +312,9 @@
   # `proj` -- the function, its completions and the 30-proj-cargo.fish snippet
   # -- comes from its own repo's home-manager module, imported at the top of
   # this file.
+  programs.proj.herdr.enable = true;
+  # Replaces the hand-written copy this was taken from.
+  xdg.configFile."herdr/config.toml".force = true;
 
   # Everything that was in ~/.gitconfig, which guest-setup.sh and hand-editing
   # built up over the life of this VM. home-manager writes ~/.config/git/config,
