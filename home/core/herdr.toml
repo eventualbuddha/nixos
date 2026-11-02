@@ -10,8 +10,8 @@ auto_switch = false
 [ui]
 agent_panel_sort = "spaces"
 
-# Tokens reported by proj's herdr plugin on vxdev. Sidebar layouts and keys
-# come from the attaching client's config, so judy needs these too.
+# Tokens reported by proj's herdr plugin on vxdev. Sidebar layouts come from
+# the attaching client's config, so work and judy need these too.
 [ui.sidebar.spaces]
 rows = [
   ["state_icon", "workspace"],
@@ -30,6 +30,9 @@ rows = [
   [{ token = "$project", dim = true }, "terminal_title_stripped"],
 ]
 
+# The action runs on the server (vx). A `herdr --remote` attach with the
+# default local keybindings drops `[[keys.command]]` entries, so attach with
+# `--remote-keybindings server` (the `hvx` abbreviation).
 [[keys.command]]
 key = "prefix+d"
 type = "plugin_action"

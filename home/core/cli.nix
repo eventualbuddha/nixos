@@ -90,8 +90,10 @@ in
     brightnessctl
   ];
 
-  # Shared by every host: a `herdr --remote` attach takes its keybindings and
-  # sidebar layout from the local config, not the server's.
+  # Shared by every host: a `herdr --remote` attach draws the sidebar from the
+  # local config, and takes keybindings from it too unless run with
+  # `--remote-keybindings server` -- except `[[keys.command]]` entries, which
+  # a local-keybindings attach drops (see `hvx` in ../desktop/terminal.nix).
   xdg.configFile."herdr/config.toml".source = ./herdr.toml;
 
   # `tldr` -- community cheatsheets for common commands. tealdeer's default TLS
