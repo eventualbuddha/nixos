@@ -27,11 +27,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1786887553,
-        "narHash": "sha256-0J8EwNSJ/2OeyuvXgfG+k5uBT1gkg0ww7VEo+14xl50=",
+        "lastModified": 1793193205,
+        "narHash": "sha256-X6xa6sGA7RnJQuZGbFMC+K+KToWAlBDCCjJXfTwEPsw=",
         "owner": "nix-community",
         "repo": "home-manager",
-        "rev": "5bd505963717a894b02a57cdbcc00db28d9b029f",
+        "rev": "095fef2f265c3c0da4fe315efba8f8a04495ab34",
         "type": "github"
       },
       "original": {
@@ -176,26 +176,6 @@
         "type": "github"
       }
     },
-    "noctalia": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1786905003,
-        "narHash": "sha256-9cqskxPJZ+I5+As8keeu4Vd/UZFhfHdO+FXHENfbq4Y=",
-        "owner": "noctalia-dev",
-        "repo": "noctalia",
-        "rev": "ed64dbc392f2f90d12712d6aadca32fcafd17bb4",
-        "type": "github"
-      },
-      "original": {
-        "owner": "noctalia-dev",
-        "repo": "noctalia",
-        "type": "github"
-      }
-    },
     "proj": {
       "inputs": {
         "nixpkgs": [
@@ -224,7 +204,6 @@
         "niri": "niri",
         "nix-flatpak": "nix-flatpak",
         "nixpkgs": "nixpkgs_2",
-        "noctalia": "noctalia",
         "proj": "proj",
         "virsh-usb": "virsh-usb",
         "zen-browser": "zen-browser"
