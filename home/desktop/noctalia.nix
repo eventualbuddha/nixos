@@ -1,4 +1,4 @@
-{ inputs, ... }:
+{ inputs, pkgs, ... }:
 
 {
   imports = [
@@ -6,6 +6,10 @@
   ];
 
   programs.noctalia.enable = true;
+  # nixpkgs' build, not the flake's own package: noctalia publishes no binary
+  # cache, so the flake package compiles from source on every input bump. The
+  # flake still supplies the home module (settings, systemd unit).
+  programs.noctalia.package = pkgs.noctalia;
   # Defaults are already a polished, animated bar/launcher/OSD set --
   # tune from noctalia's own settings UI once you know what you want to change.
 

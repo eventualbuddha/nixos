@@ -2,7 +2,7 @@
 # ../common.nix -- this file should only grow hardware quirks specific to this
 # box (GPU driver, extra kernel params, etc).
 
-{ pkgs, ... }:
+{ pkgs, inputs, ... }:
 
 let
   # judy's own vxsuite guest's address on the `vmguard` bridge -- a static DHCP
@@ -18,6 +18,7 @@ in
     ./hardware-configuration.nix
     ../common.nix
     ../../modules/vmguard.nix
+    inputs.nix-flatpak.nixosModules.nix-flatpak
   ];
 
   networking.hostName = "judy";
@@ -135,21 +136,21 @@ in
   };
 
   # Bambu Studio: only judy has a Bambu printer, so keep this off other hosts.
-  # Wrapped to route through xwayland-satellite (above) instead of niri's
-  # native Wayland, which it crashes on.
-  environment.systemPackages = [
-    (pkgs.symlinkJoin {
-      name = "bambu-studio-wrapped";
-      paths = [ pkgs.bambu-studio ];
-      buildInputs = [ pkgs.makeWrapper ];
-      postBuild = ''
-        rm $out/bin/bambu-studio
-        makeWrapper ${pkgs.bambu-studio}/bin/bambu-studio $out/bin/bambu-studio \
-          --set GDK_BACKEND x11 \
-          --set DISPLAY :0
-      '';
-    })
-  ];
+  # Installed from Flathub (Bambu's official build) rather than nixpkgs, whose
+  # build often misses the binary cache and then compiles for hours. Forced
+  # onto X11 through xwayland-satellite (above), since it crashes on niri's
+  # native Wayland.
+  services.flatpak.packages = [ "com.bambulab.BambuStudio" ];
+  services.flatpak.overrides.settings."com.bambulab.BambuStudio" = {
+    Context.sockets = [
+      "x11"
+      "!wayland"
+    ];
+    Environment = {
+      GDK_BACKEND = "x11";
+      DISPLAY = ":0";
+    };
+  };
 
   # --- Prompt ----------------------------------------------------------------
   #

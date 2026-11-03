@@ -54,6 +54,10 @@
       url = "github:ipeglin/artcraft-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Declarative Flatpak installs and overrides, consumed through its
+    # `nixosModules.nix-flatpak` from hosts/judy (Bambu Studio).
+    nix-flatpak.url = "github:gmodena/nix-flatpak/?ref=v0.8.0";
   };
 
   outputs =
