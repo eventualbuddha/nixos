@@ -146,11 +146,28 @@ in
       "x11"
       "!wayland"
     ];
-    Environment = {
-      GDK_BACKEND = "x11";
-      DISPLAY = ":0";
-    };
+    Environment.GDK_BACKEND = "x11";
   };
+  # Flatpak only mounts the X11 socket when DISPLAY is set on the host side,
+  # and the niri session leaves it unset. This entry shadows Flathub's
+  # exported one to set it for Bambu alone, leaving every other app on native
+  # Wayland. It has to live in ~/.local/share (XDG_DATA_HOME): the Flatpak
+  # export dirs come ahead of the home-manager profile in XDG_DATA_DIRS, so
+  # an xdg.desktopEntries entry would lose to Flathub's.
+  home-manager.users.brian.xdg.dataFile."applications/com.bambulab.BambuStudio.desktop".text = ''
+    [Desktop Entry]
+    Name=BambuStudio
+    GenericName=3D Printing Software
+    Icon=com.bambulab.BambuStudio
+    Exec=env DISPLAY=:0 flatpak run --branch=stable --arch=x86_64 --command=entrypoint --file-forwarding com.bambulab.BambuStudio @@u %U @@
+    Terminal=false
+    Type=Application
+    MimeType=model/stl;model/3mf;application/vnd.ms-3mfdocument;application/prs.wavefront-obj;application/x-amf;x-scheme-handler/bambustudio;model/step;
+    Categories=Graphics;3DGraphics;Engineering;
+    Keywords=3D;Printing;Slicer;slice;printer;convert;gcode;stl;obj;amf;SLA
+    StartupNotify=false
+    StartupWMClass=bambu-studio
+  '';
 
   # --- Prompt ----------------------------------------------------------------
   #
