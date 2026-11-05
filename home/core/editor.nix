@@ -167,6 +167,35 @@
     }
   '';
 
+  # PR review in neovim. octo.nvim itself comes from LazyVim's util.octo extra
+  # (enabled in the mutable lazyvim.json); this only tweaks it and adds diffview.
+  xdg.configFile."nvim/lua/plugins/review.lua".text = ''
+    return {
+      {
+        "pwntester/octo.nvim",
+        opts = {
+          -- With the PR checked out, the review's right-hand buffer is the real
+          -- file, so LSP and go-to-definition work while reviewing.
+          use_local_fs = true,
+        },
+      },
+      {
+        "sindrets/diffview.nvim",
+        cmd = { "DiffviewOpen", "DiffviewFileHistory" },
+        keys = {
+          { "<leader>gv", "", desc = "+diffview" },
+          { "<leader>gvb", "<cmd>DiffviewOpen origin/HEAD...HEAD<cr>", desc = "Branch vs base" },
+          { "<leader>gvo", "<cmd>DiffviewOpen<cr>", desc = "Working tree" },
+          { "<leader>gvh", "<cmd>DiffviewFileHistory %<cr>", desc = "File history" },
+          { "<leader>gvq", "<cmd>DiffviewClose<cr>", desc = "Close" },
+        },
+        opts = {
+          enhanced_diff_hl = true,
+        },
+      },
+    }
+  '';
+
   xdg.configFile."nvim/lua/config/keymaps.lua".text = ''
     -- Keymaps are automatically loaded on the VeryLazy event
     -- Default keymaps that are always set: https://github.com/LazyVim/LazyVim/blob/main/lua/lazyvim/config/keymaps.lua
