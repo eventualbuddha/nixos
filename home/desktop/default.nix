@@ -17,5 +17,6 @@ _:
     ./vx-files.nix
     ./helium.nix
     ./t3code.nix
+    ./herdr-app.nix
   ];
 }
