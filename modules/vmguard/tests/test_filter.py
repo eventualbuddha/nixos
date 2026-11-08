@@ -1131,6 +1131,14 @@ check("ro61/nodesource_post",     gh("/setup_26.x", "POST", host="deb.nodesource
 check("ro61/nodesource_no_creds", hdrs("/setup_26.x", "GET", "deb.nodesource.com"), {})
 check("ro61/nodesource_rpm_shut", gh("/", "GET", host="rpm.nodesource.com"), "deny")
 
+# ---- herdr-core releases (NOTES 63): tarballs + manifest on one exact host, read-only ----
+check("ro63/herdr_core_tarball",  gh("/core/0.1.19/herdr-core-linux-x86_64.tar.gz", "GET", host="releases.herdr.dev"), "allow")
+check("ro63/herdr_core_manifest", gh("/core/latest.json", "GET", host="releases.herdr.dev"), "allow")
+check("ro63/herdr_head",          gh("/core/latest.json", "HEAD", host="releases.herdr.dev"), "allow")
+check("ro63/herdr_post",          gh("/core/latest.json", "POST", host="releases.herdr.dev"), "deny")
+check("ro63/herdr_no_creds",      hdrs("/core/latest.json", "GET", "releases.herdr.dev"), {})
+check("ro63/herdr_other_sub",     gh("/", "GET", host="api.herdr.dev"), "deny")
+
 try:
     os.remove(os.environ["VMGUARD_DENYLOG"])
 except OSError:

@@ -1769,6 +1769,24 @@ needs doing, and how to back everything out.
       still denied.
     - Deploy: `./apply.sh` on `work`, then on `judy`.
 
+63. **`releases.herdr.dev` opened read-only (2026-11-08, on request).** The guest's home config
+    now installs herdr-core (`home/core/herdr-core-package.nix`), so that the Herdr desktop app
+    on the host can run terminals in the guest over SSH. Its nix fetch 403'd here. herdr-core's
+    tarballs and `latest.json` manifests are published only on this host: the GitHub repo has
+    tags but no releases, so there's no already-open mirror to point at. `herdr.dev` was opened
+    in item 8, but entries are exact hosts.
+    - Checked from the host: the tarball and the manifest both answer 200 directly (behind
+      Cloudflare), with no redirect, so one entry covers the fetch.
+    - **This admits an executable** (the static `herdr-core` binary). Integrity is the hash
+      pinned in the nix package. That covers the guest's nix fetch. A `curl | sh` of herdr's
+      own installer in the guest would also get through now, trusted only by TLS and the
+      manifest's sha256.
+    - GET/HEAD only, no credentials injected, writes denied. Exact host: `api.herdr.dev` and the
+      rest of `*.herdr.dev` stay denied.
+    - Tests now 659 cases (+6): tarball and manifest GET allowed, HEAD allowed, POST denied, no
+      headers injected, another subdomain pinned denied.
+    - Deploy: `./apply.sh` on `work`, then on `judy`.
+
 ## Running it: `Justfile` (RETIRED)
 
 > **THE JUSTFILE IS GONE, DELETED IN THE NIXOS PORT (2026-08-28).** This section, and the two

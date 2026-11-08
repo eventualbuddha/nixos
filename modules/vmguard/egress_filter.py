@@ -725,6 +725,11 @@ READ_ONLY_HOSTS = {"api.mason-registry.dev", "downloads.claude.ai", "herdr.dev",
                    # the node_XX.x apt repo it registers are all on this one host. Integrity is
                    # apt's own gpg sigs, as above.
                    "deb.nodesource.com",
+                   # herdr-core release tarballs and their manifest (NOTES 63), the only place
+                   # they're published. The guest's nix fetches them by pinned hash. Served
+                   # directly, not via a redirect. Separate from `herdr.dev` above because
+                   # entries are exact hosts.
+                   "releases.herdr.dev",
                    # CI. `circleci.com` itself is NOT in this tier any more — it has its own
                    # handler (section 3a) because one endpoint on it takes a credential. Its
                    # reads are unchanged: GET/HEAD, no creds, exactly as this tier would give.
