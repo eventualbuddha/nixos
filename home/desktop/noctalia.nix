@@ -1,4 +1,4 @@
-{ ... }:
+_:
 
 {
   # home-manager's own module, with nixpkgs' (binary-cached) package. Started
