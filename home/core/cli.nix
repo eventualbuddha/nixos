@@ -1,42 +1,5 @@
 { pkgs, ... }:
 
-let
-  # herdr isn't in nixpkgs. Building it from source isn't practical: it
-  # vendors Ghostty's libghostty-vt (a Zig library) and pulls in Ghostty's
-  # own Zig dependency-fetching machinery to build it -- nixpkgs' own
-  # `ghostty` package already solves that problem, but it's substantial
-  # machinery not worth re-deriving just for this. Its GitHub release
-  # binaries are fully static (`file` reports "static-pie linked", no
-  # `.interp` section) though, so no autoPatchelfHook/dynamic-linking dance
-  # is needed -- just fetch and drop it in $out/bin. Bump `version` and
-  # `hash` (via `nix store prefetch-file --json <release-url>`) to update.
-  herdr =
-    let
-      version = "0.9.4";
-    in
-    pkgs.stdenvNoCC.mkDerivation {
-      pname = "herdr";
-      inherit version;
-      src = pkgs.fetchurl {
-        url = "https://github.com/herdrdev/herdr/releases/download/v${version}/herdr-linux-x86_64";
-        hash = "sha256-STME+++w7Q6gRV83O0f0jSTod0vHl09MkWrS6TdnWyM=";
-      };
-      dontUnpack = true;
-      installPhase = ''
-        runHook preInstall
-        install -Dm755 $src $out/bin/herdr
-        runHook postInstall
-      '';
-      meta = {
-        description = "Terminal workspace manager for AI coding agents";
-        homepage = "https://herdr.dev";
-        license = pkgs.lib.licenses.asl20;
-        platforms = [ "x86_64-linux" ];
-        mainProgram = "herdr";
-      };
-    };
-
-in
 {
   # Terminal tools that are wanted on every machine, graphical or not -- a
   # headless build VM reached over SSH gets exactly the same shell as the

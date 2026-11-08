@@ -29,10 +29,10 @@
 let
   # vite-plus (https://viteplus.dev) is not in nixpkgs, so fetch the release
   # tarball, whose only content is a single `vp`. The musl build is the
-  # tempting one -- static-pie, no .interp section, no autoPatchelfHook needed,
-  # the same shape as `herdr` in ./cli.nix -- but see the header: vp derives
-  # the libc of the node tarballs it downloads from its own target triple, so
-  # the musl vp hands this Debian box node builds it cannot exec. The gnu build
+  # tempting one -- static-pie, no .interp section, no autoPatchelfHook needed
+  # -- but see the header: vp derives the libc of the node tarballs it
+  # downloads from its own target triple, so the musl vp hands this Debian box
+  # node builds it cannot exec. The gnu build
   # is dynamically linked against glibc/libgcc and needs the usual patchelf
   # pass.
   #
