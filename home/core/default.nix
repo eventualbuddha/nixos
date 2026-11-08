@@ -13,6 +13,7 @@ _:
   imports = [
     ./shell.nix
     ./cli.nix
+    ./herdr-core.nix
     ./dev-tools.nix
     ./claude-code.nix
     ./codex.nix

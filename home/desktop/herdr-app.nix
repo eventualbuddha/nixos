@@ -1,50 +1,21 @@
 # Herdr (https://herdr.dev/download/), a desktop front-end for coding-agent
-# terminals, and herdr-core (`hc`), the server it talks to. Not the same
-# program as the `herdr` TUI in ../core/cli.nix.
+# terminals. Not the same program as the `herdr` TUI in ../core/cli.nix. It
+# talks to herdr-core, which is in ../core/herdr-core.nix so that hosts
+# without a desktop get it too.
 #
-# Both come from herdr's prebuilt release tarballs instead of its `curl | sh`
-# installer. The installer would put them in ~/.local, where they update
-# themselves. From the store, neither does:
+# Built from herdr's prebuilt release tarball instead of its `curl | sh`
+# installer. The installer would put it in ~/.local, where it updates itself.
+# From the store it doesn't: it only updates itself when `herdr-app.svg` sits
+# next to its binary, so the icon goes under share/ instead.
 #
-# - The app only updates itself when `herdr-app.svg` sits next to its binary,
-#   so the icon goes under share/ instead.
-# - herdr-core sees it lives under /nix/store and reports itself as managed by
-#   nix. The app then leaves it alone too.
-#
-# To update, bump `version` and `hash` from the manifests at
-# https://releases.herdr.dev/{app,core}/latest.json. The sha256 there is hex:
+# To update, bump `version` and `hash` from
+# https://releases.herdr.dev/app/latest.json. The sha256 there is hex:
 # `nix hash convert --hash-algo sha256 --to sri <hex>` turns it into a hash.
-# The app manifest names the oldest core it supports (`core_min`).
+# The manifest names the oldest core it supports (`core_min`).
 { pkgs, lib, ... }:
 
 let
-  # Fully static, like the `herdr` release binary, so there's nothing to patch.
-  herdr-core =
-    let
-      version = "0.1.19";
-    in
-    pkgs.stdenvNoCC.mkDerivation {
-      pname = "herdr-core";
-      inherit version;
-      src = pkgs.fetchurl {
-        url = "https://releases.herdr.dev/core/${version}/herdr-core-linux-x86_64.tar.gz";
-        hash = "sha256-Stz7Qj1S8kxcxKHizS/K0fYtKLt3h2rEcsKQgqPqpCQ=";
-      };
-      sourceRoot = ".";
-      installPhase = ''
-        runHook preInstall
-        install -Dm755 herdr-core $out/bin/herdr-core
-        ln -s herdr-core $out/bin/hc
-        runHook postInstall
-      '';
-      meta = {
-        description = "Terminals for coding agents that keep running";
-        homepage = "https://herdr.dev";
-        license = lib.licenses.asl20;
-        platforms = [ "x86_64-linux" ];
-        mainProgram = "herdr-core";
-      };
-    };
+  herdr-core = pkgs.callPackage ../core/herdr-core-package.nix { };
 
   herdr-app =
     let
@@ -79,8 +50,8 @@ let
         runHook preInstall
         install -Dm755 herdr-app $out/libexec/herdr-app
         install -Dm644 herdr-app.svg $out/share/icons/hicolor/scalable/apps/herdr-app.svg
-        # The app looks for the core on PATH, so this pins it to the one
-        # packaged above.
+        # The app looks for the core on PATH, so this pins it to the one from
+        # ../core/herdr-core-package.nix.
         makeWrapper $out/libexec/herdr-app $out/bin/herdr-app \
           --prefix PATH : ${herdr-core}/bin
         runHook postInstall
@@ -96,11 +67,7 @@ let
     };
 in
 {
-  # herdr-core is on PATH too, for `hc` from a terminal.
-  home.packages = [
-    herdr-app
-    herdr-core
-  ];
+  home.packages = [ herdr-app ];
 
   # The same entry the installer writes. StartupWMClass lets niri and the bar
   # match the app's windows to this entry.
