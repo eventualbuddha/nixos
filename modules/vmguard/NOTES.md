@@ -1787,6 +1787,28 @@ needs doing, and how to back everything out.
       headers injected, another subdomain pinned denied.
     - Deploy: `./apply.sh` on `work`, then on `judy`.
 
+64. **`votingworks-apt-snapshots.s3.us-west-2.amazonaws.com` opened read-only (2026-11-09, on
+    request).** This is the bucket item 45 set aside as "its own decision". Deny-log evidence:
+    `GET /kiosk-browser/kiosk-browser_1.4.0_amd64.deb` at 09:43:56, from kiosk-browser's
+    `make all`. Its `script/install-dependencies.sh` runs `curl -f` for a prebuilt .deb of the
+    current version and falls back to a source build if that fails, so the deny only cost a
+    prebuilt shortcut, never the build.
+    - Checked from the host: `kiosk-browser_1.0.0` and `_1.1.0` answer 200 (`server: AmazonS3`,
+      no redirect). `_1.4.0` (the current version) and `1.2.0`–`1.3.2` answer 403 because they
+      aren't published. The bucket doesn't allow listing, so S3 answers 403 for a missing key.
+      **So this entry does not change today's build**. It takes effect once a prebuilt for the
+      current version is uploaded.
+    - Why one exact bucket is acceptable here despite item 60's no-S3-wildcard rule: the
+      VotingWorks org owns this bucket, so a GET can't put a URL in an attacker's access logs.
+      **This admits an executable** (.deb packages, which get `dpkg -i`'d). Integrity rests on
+      TLS and the bucket's write ACL only: there's no signature or pinned hash.
+    - GET/HEAD only, no credentials injected, writes denied. Exact regional virtual-hosted name
+      only: the bare `votingworks-apt-snapshots.s3.amazonaws.com`, path-style
+      `s3.us-west-2.amazonaws.com/votingworks-apt-snapshots/…` and other buckets in the region
+      are all pinned denied.
+    - Tests now 667 cases (+8).
+    - Deploy: `./apply.sh` on `work`, then on `judy`.
+
 ## Running it: `Justfile` (RETIRED)
 
 > **THE JUSTFILE IS GONE, DELETED IN THE NIXOS PORT (2026-08-28).** This section, and the two

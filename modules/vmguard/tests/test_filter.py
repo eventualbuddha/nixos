@@ -1139,6 +1139,17 @@ check("ro63/herdr_post",          gh("/core/latest.json", "POST", host="releases
 check("ro63/herdr_no_creds",      hdrs("/core/latest.json", "GET", "releases.herdr.dev"), {})
 check("ro63/herdr_other_sub",     gh("/", "GET", host="api.herdr.dev"), "deny")
 
+# ---- VotingWorks apt snapshots (NOTES 64): one exact org-owned bucket host, read-only ----
+_VXAPT = "votingworks-apt-snapshots.s3.us-west-2.amazonaws.com"
+check("ro64/vxapt_deb",          gh("/kiosk-browser/kiosk-browser_1.4.0_amd64.deb", "GET", host=_VXAPT), "allow")
+check("ro64/vxapt_head",         gh("/kiosk-browser/kiosk-browser_1.4.0_amd64.deb", "HEAD", host=_VXAPT), "allow")
+check("ro64/vxapt_put",          gh("/kiosk-browser/x.deb", "PUT", host=_VXAPT), "deny")
+check("ro64/vxapt_post",         gh("/", "POST", host=_VXAPT), "deny")
+check("ro64/vxapt_no_creds",     hdrs("/kiosk-browser/x.deb", "GET", _VXAPT), {})
+check("ro64/vxapt_plain_s3",     gh("/kiosk-browser/x.deb", "GET", host="votingworks-apt-snapshots.s3.amazonaws.com"), "deny")
+check("ro64/vxapt_path_style",   gh("/votingworks-apt-snapshots/kiosk-browser/x.deb", "GET", host="s3.us-west-2.amazonaws.com"), "deny")
+check("ro64/vxapt_other_bucket", gh("/x", "GET", host="evil.s3.us-west-2.amazonaws.com"), "deny")
+
 try:
     os.remove(os.environ["VMGUARD_DENYLOG"])
 except OSError:

@@ -987,6 +987,13 @@ READ_ONLY_HOSTS = {"api.mason-registry.dev", "downloads.claude.ai", "herdr.dev",
                    # bucket and a GET to one they own lands its URL in their access logs. The
                    # regional and bare S3 names for the same bucket are not listed.
                    "ocrs-models.s3-accelerate.amazonaws.com",
+                   #
+                   # VotingWorks' own apt-snapshot bucket (NOTES 64): kiosk-browser's
+                   # install-dependencies.sh fetches a prebuilt kiosk-browser_<ver>_amd64.deb
+                   # from here, falling back to a source build on failure. Org-owned, so the
+                   # attacker-owned-bucket concern behind "no S3 wildcard" doesn't apply to this
+                   # one name. Exact regional virtual-hosted name only.
+                   "votingworks-apt-snapshots.s3.us-west-2.amazonaws.com",
                    }
 
 # The read-only hosts that cannot be listed exactly, as full-match patterns: same policy as
