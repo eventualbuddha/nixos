@@ -45,18 +45,30 @@ let
   # check the focused window's app-id and inject the right combo. Add more
   # app-ids to the terminal case as you add more terminal emulators.
   #
-  # herdr-app is in the terminal case even though not all of it is a terminal.
-  # Its keys.json only binds Ctrl+Shift+C/V to terminal.copy/terminal.paste
-  # while a terminal has focus. terminal.copy hands the key to the program
-  # when nothing is selected, and Ctrl+Shift+C does nothing in a shell.
+  # herdr-app is mostly terminals, but its command palette, help and settings
+  # are overlays with ordinary text fields that only know Ctrl+C/V. Whether one
+  # is open is the one thing we can't tell from niri, so we ask herdr-app
+  # itself: `herdr-app status` lists open overlays (frame-palette, say) in a few
+  # milliseconds. With none open, keyboard focus is in a terminal, where
+  # keys.json binds Ctrl+Shift+C/V to terminal.copy/terminal.paste.
+  # terminal.copy hands the key to the program when nothing is selected, and
+  # Ctrl+Shift+C does nothing in a shell. If status fails, assume a terminal.
   modClipboard =
     name: key:
     pkgs.writeShellScriptBin name ''
       set -euo pipefail
       app_id=$(${pkgs.niri}/bin/niri msg --json focused-window | ${pkgs.jq}/bin/jq -r '.app_id // empty')
       case "$app_id" in
-        com.mitchellh.ghostty | herdr-app)
+        com.mitchellh.ghostty)
           ${pkgs.wtype}/bin/wtype -M ctrl -M shift -k ${key} -m shift -m ctrl
+          ;;
+        herdr-app)
+          overlays=$(herdr-app status 2>/dev/null | ${pkgs.jq}/bin/jq -r '.overlays | length' 2>/dev/null || echo 0)
+          if [ "''${overlays:-0}" -gt 0 ]; then
+            ${pkgs.wtype}/bin/wtype -M ctrl -k ${key} -m ctrl
+          else
+            ${pkgs.wtype}/bin/wtype -M ctrl -M shift -k ${key} -m shift -m ctrl
+          fi
           ;;
         *)
           ${pkgs.wtype}/bin/wtype -M ctrl -k ${key} -m ctrl
