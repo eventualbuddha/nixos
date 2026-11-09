@@ -34,14 +34,6 @@ set -gx NODE_EXTRA_CA_CERTS /etc/ssl/certs/ca-certificates.crt
 # "fetch failed" that never reaches the deny log. `npx t3` was the case that
 # found it. Node 24+ reads this and routes fetch and http(s) through the proxy.
 set -gx NODE_USE_ENV_PROXY 1
-
-# cloudflared (T3 Connect's relay client) ignores HTTP(S)_PROXY and dials
-# Cloudflare's tunnel edge directly, so point it at the host's TCP relay for
-# that edge instead. http2 because the default, QUIC, is UDP and the relay is
-# TCP. This is a way out the egress filter does not see; read the
-# `vmguard-cf-edge` comment in modules/vmguard.nix before reusing it.
-set -gx TUNNEL_EDGE 192.168.124.1:7844
-set -gx TUNNEL_TRANSPORT_PROTOCOL http2
 # Python's requests is another: it verifies against certifi's bundled roots, not
 # the system store, so poetry (and anything else built on requests) fails with
 # "unknown ca" against pypi.org. requests and pip both honor this variable.
