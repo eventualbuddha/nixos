@@ -44,13 +44,18 @@ let
   # literal-next-key quote) and use the Ctrl+Shift+ variants instead -- so these
   # check the focused window's app-id and inject the right combo. Add more
   # app-ids to the terminal case as you add more terminal emulators.
+  #
+  # herdr-app is in the terminal case even though not all of it is a terminal.
+  # Its keys.json only binds Ctrl+Shift+C/V to terminal.copy/terminal.paste
+  # while a terminal has focus. terminal.copy hands the key to the program
+  # when nothing is selected, and Ctrl+Shift+C does nothing in a shell.
   modClipboard =
     name: key:
     pkgs.writeShellScriptBin name ''
       set -euo pipefail
       app_id=$(${pkgs.niri}/bin/niri msg --json focused-window | ${pkgs.jq}/bin/jq -r '.app_id // empty')
       case "$app_id" in
-        com.mitchellh.ghostty)
+        com.mitchellh.ghostty | herdr-app)
           ${pkgs.wtype}/bin/wtype -M ctrl -M shift -k ${key} -m shift -m ctrl
           ;;
         *)
