@@ -17,6 +17,7 @@ _:
     ./dev-tools.nix
     ./claude-code.nix
     ./codex.nix
+    ./copilot.nix
     ./editor.nix
     ./git.nix
   ];
