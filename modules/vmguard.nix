@@ -27,7 +27,7 @@
 # Two pieces are deliberately NOT declared here, because a git repo is the wrong
 # place for either, and both are per-host:
 #
-#   /etc/vmguard/secrets.env            GH_PAT + CIRCLE_TOKEN, root-owned 0600.
+#   /etc/vmguard/secrets.env            GH_PAT + CIRCLE_TOKEN + COPILOT_TOKEN, root-owned 0600.
 #   /var/lib/vmguard/mitmproxy-conf/    the MITM CA -- including its private key.
 #
 # Each host has its own CA, and a host's CA has to be *preserved* rather than

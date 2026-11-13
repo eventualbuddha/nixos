@@ -40,3 +40,15 @@ set -gx NODE_USE_ENV_PROXY 1
 set -gx REQUESTS_CA_BUNDLE /etc/ssl/certs/ca-certificates.crt
 
 set -gx GIT_TERMINAL_PROMPT 0
+
+# Copilot CLI's credential, which is not a credential: the guest holds no GitHub
+# token, so the CLI gets this placeholder and the proxy swaps in the real
+# Copilot-only token host-side. It has the github_pat_ shape because the CLI
+# checks the format locally (and refuses classic ghp_ tokens). It must match
+# COPILOT_PLACEHOLDER in modules/vmguard/egress_filter.py. Don't `/login` here:
+# the device flow's POSTs to github.com are denied on purpose. See NOTES 65.
+#
+# Set here rather than in home.sessionVariables: long-lived herdr-core servers
+# carry __HM_SESS_VARS_SOURCED, so shells they spawn skip hm-session-vars and
+# never see a variable added after the server started. This file runs every time.
+set -gx COPILOT_GITHUB_TOKEN github_pat_vmguard_placeholder_swapped_in_host_side

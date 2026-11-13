@@ -1809,6 +1809,55 @@ needs doing, and how to back everything out.
     - Tests now 667 cases (+8).
     - Deploy: `./apply.sh` on `work`, then on `judy`.
 
+65. **Copilot CLI: a separate host-side token, swapped in for a guest placeholder (2026-11-13,
+    on request).** Copilot CLI's `/login` in the guest failed. Deny log:
+    `POST github.com/login/device/code` at 10:25:51, "github.com non-read method denied". It
+    didn't get any further, but older logs show what would have failed next:
+    `api.individual.githubcopilot.com /models` and `api.githubcopilot.com /agents/...` were
+    both denied as not on the allowlist. `api.github.com/copilot_internal/{v2/token,user}`
+    already worked, with GH_PAT injected.
+    - **Not the Codex route (item 54).** Two options were considered:
+      - **B:** open the device flow on github.com and tunnel the inference hosts. This puts a
+        real `gho_` token in the guest, which could leave over the tunnel and would work from
+        anywhere.
+      - **A (chosen):** keep the guest credential-free, as with GitHub and CircleCI.
+    - **Separate token, not GH_PAT.** GH_PAT on the deployed hosts turned out to be a classic
+      `ghp_` token, despite the template saying fine-grained. Copilot refuses
+      classic tokens, and a classic token can't get the Copilot Requests permission anyway.
+      The new `COPILOT_TOKEN` is fine-grained with a personal owner, public repos read-only,
+      no repository permissions, and the "Copilot Requests" account permission only. It can't
+      write to GitHub. If it's missing, Copilot requests are denied one by one, like
+      `CIRCLE_TOKEN`; the gate still starts.
+    - **Placeholder swap, not overwrite.** The guest holds
+      `COPILOT_GITHUB_TOKEN=github_pat_vmguard_placeholder_swapped_in_host_side`
+      (`hosts/vxdev/fish/20-vmguard.fish`). It has the `github_pat_` shape so the CLI's local format check
+      passes. On the Copilot hosts the addon replaces the placeholder wherever it appears in
+      `Authorization`, and leaves any other value alone. That keeps a short-lived Copilot
+      session token working, if the CLI mints one via `/copilot_internal/v2/token`, which
+      itself now gets COPILOT_TOKEN rather than GH_PAT (reads only).
+    - **Bumped, not tunnelled**, since the header has to be rewritten. That also adds a log
+      line for each request (kind `COPILOT`, so inference POSTs don't bury the real `WRITE`
+      audit records), plus one path rule: **no writes under `/agents` on
+      `api.githubcopilot.com`**. That's the cloud coding agent's job API, which opens PRs from
+      GitHub's side and would get round WRITE_ORGS. Its reads stay open.
+    - Request bodies aren't inspected, so this is a third uninspected-content channel to a
+      model provider, alongside api.anthropic.com and the OpenAI hosts.
+    - **Left denied:** `copilot-telemetry.githubusercontent.com`,
+      `copilot-proxy.githubusercontent.com`, `api.business.githubcopilot.com` (the seat is
+      personal), and the device-flow POSTs on github.com. Don't `/login` in the guest.
+    - **Not verified yet:** whether the CLI starts with the placeholder, and whether it calls
+      paths not mapped here. Watch the deny log on the first run. If the placeholder doesn't
+      work, the fallback is B.
+    - Tests now 694 cases (+27): inference reads and POSTs allowed on both hosts; `/agents`
+      POST/PUT/DELETE denied, and `/agentsx` not caught by the rule; placeholder swapped under
+      both `Bearer` and `token`; a session token left alone; no header added when there's
+      none; GH_PAT never used; denied when the token is unset; `/copilot_internal` gets the
+      Copilot token for reads only, while other api.github.com paths keep GH_PAT; telemetry,
+      proxy, business and device-login all denied.
+    - Deploy: add `COPILOT_TOKEN` to `/etc/vmguard/secrets.env` on each host, then
+      `./apply.sh` on `work` and `judy` (addon), then `./apply.sh` on vx (the placeholder),
+      then open a new shell there.
+
 ## Running it: `Justfile` (RETIRED)
 
 > **THE JUSTFILE IS GONE, DELETED IN THE NIXOS PORT (2026-08-28).** This section, and the two

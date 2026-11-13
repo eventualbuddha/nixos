@@ -1150,6 +1150,57 @@ check("ro64/vxapt_plain_s3",     gh("/kiosk-browser/x.deb", "GET", host="votingw
 check("ro64/vxapt_path_style",   gh("/votingworks-apt-snapshots/kiosk-browser/x.deb", "GET", host="s3.us-west-2.amazonaws.com"), "deny")
 check("ro64/vxapt_other_bucket", gh("/x", "GET", host="evil.s3.us-west-2.amazonaws.com"), "deny")
 
+# ---- Copilot (NOTES 65): a separate host-side token, swapped in for the guest's placeholder ----
+CP_IND, CP_API = "api.individual.githubcopilot.com", "api.githubcopilot.com"
+PH = gf.COPILOT_PLACEHOLDER
+
+def cop(path, method="GET", host=CP_IND, auth=None, token="dummy-copilot-token"):
+    """Returns (decision, headers-after) for one request, with COPILOT_TOKEN set to `token`."""
+    saved, gf.COPILOT_TOKEN = gf.COPILOT_TOKEN, token
+    try:
+        headers = {} if auth is None else {"authorization": auth}
+        flow = types.SimpleNamespace(request=types.SimpleNamespace(
+            pretty_host=host, method=method, path=path,
+            path_components=[c for c in path.split("?")[0].split("/") if c],
+            query={}, headers=headers))
+        flow.response = None
+        gf.EgressFilter().request(flow)
+        return ("deny" if flow.response is not None else "allow"), flow.request.headers
+    finally:
+        gf.COPILOT_TOKEN = saved
+
+check("cp65/ind_models",          cop("/models")[0], "allow")
+check("cp65/ind_chat_post",       cop("/chat/completions", "POST")[0], "allow")
+check("cp65/api_agents_read",     cop("/agents/sessions?page_size=20", host=CP_API)[0], "allow")
+check("cp65/api_swe_models",      cop("/agents/swe/models", host=CP_API)[0], "allow")
+check("cp65/api_chat_post",       cop("/chat/completions", "POST", host=CP_API)[0], "allow")
+# the coding agent's job API can open PRs, getting round WRITE_ORGS: no writes under /agents
+check("cp65/api_agent_job_post",  cop("/agents/swe/v1/jobs/torvalds/linux", "POST", host=CP_API)[0], "deny")
+check("cp65/api_agents_root_post", cop("/agents", "POST", host=CP_API)[0], "deny")
+check("cp65/api_agents_put",      cop("/agents/sessions/1", "PUT", host=CP_API)[0], "deny")
+check("cp65/api_agents_delete",   cop("/agents/sessions/1", "DELETE", host=CP_API)[0], "deny")
+check("cp65/api_agentsx_post",    cop("/agentsx", "POST", host=CP_API)[0], "allow")   # prefix is path-segment exact
+# placeholder swapped, both bare and with a scheme; anything else left alone
+check("cp65/swap_bearer",         cop("/models", auth=f"Bearer {PH}")[1], {"authorization": "Bearer dummy-copilot-token"})
+check("cp65/swap_token",          cop("/models", auth=f"token {PH}")[1], {"authorization": "token dummy-copilot-token"})
+check("cp65/session_untouched",   cop("/models", auth="Bearer tid=abc;exp=1")[1], {"authorization": "Bearer tid=abc;exp=1"})
+check("cp65/no_auth_none_added",  cop("/models")[1], {})
+check("cp65/never_main_pat",      cop("/models", auth=f"Bearer {PH}")[1].get("authorization") == f"Bearer {gf.PAT}", False)
+# unset token: deny rather than pass the placeholder upstream
+check("cp65/ind_no_token",        cop("/models", token=None)[0], "deny")
+check("cp65/api_no_token",        cop("/chat/completions", "POST", host=CP_API, token=None)[0], "deny")
+# api.github.com /copilot_internal/: Copilot token, not GH_PAT; reads only
+check("cp65/internal_token",      cop("/copilot_internal/v2/token", host="api.github.com")[0], "allow")
+check("cp65/internal_hdr",        cop("/copilot_internal/v2/token", host="api.github.com")[1], {"authorization": "Bearer dummy-copilot-token"})
+check("cp65/internal_post",       cop("/copilot_internal/v2/token", "POST", host="api.github.com")[0], "deny")
+check("cp65/internal_no_token",   cop("/copilot_internal/user", host="api.github.com", token=None)[0], "deny")
+check("cp65/other_api_main_pat",  cop("/user", host="api.github.com")[1], {"authorization": f"Bearer {gf.PAT}"})
+# left denied
+check("cp65/telemetry_shut",      cop("/telemetry", "POST", host="copilot-telemetry.githubusercontent.com")[0], "deny")
+check("cp65/proxy_shut",          cop("/", host="copilot-proxy.githubusercontent.com")[0], "deny")
+check("cp65/business_shut",       cop("/models", host="api.business.githubcopilot.com")[0], "deny")
+check("cp65/device_login_shut",   cop("/login/device/code", "POST", host="github.com")[0], "deny")
+
 try:
     os.remove(os.environ["VMGUARD_DENYLOG"])
 except OSError:

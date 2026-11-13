@@ -1211,6 +1211,42 @@ def _circle_org(project_slug):
         return None
     return parts[1]
 
+# ---- 3b. Copilot policy ----------------------------------------------------------------
+# GitHub Copilot CLI with a personal seat (NOTES 65). The same bargain as Codex (NOTES 54) in
+# one respect, since inference means prompts and code going out to a third party, but NOT
+# tunnelled: these hosts are TLS-bumped so a host-side credential can be put in.
+#
+# The credential is a SEPARATE token, not GH_PAT. GH_PAT is a classic token and Copilot
+# refuses those; and keeping Copilot off it means the main token's reach doesn't grow. It is a
+# fine-grained token, personal owner, public repos read-only, account permission "Copilot
+# Requests" and nothing else, so on its own it cannot write to GitHub at all.
+#
+# The guest holds only COPILOT_PLACEHOLDER (in COPILOT_GITHUB_TOKEN, set by hosts/vxdev/fish/20-vmguard.fish).
+# It has the github_pat_ shape so the CLI's local format check passes; the addon swaps it for
+# the real token wherever it appears in an Authorization header. A header WITHOUT the
+# placeholder passes untouched: that covers a short-lived Copilot session token the CLI may
+# have minted via /copilot_internal/v2/token (itself only reachable with COPILOT_TOKEN).
+#
+#   api.individual.githubcopilot.com  inference (personal plan): every method, token swapped in.
+#   api.githubcopilot.com             the same, EXCEPT any write under /agents. That is the
+#                                     cloud coding agent's job API, which opens PRs on GitHub's
+#                                     side and would get round the WRITE_ORGS gate entirely.
+#                                     Its reads (/agents, /agents/sessions, /agents/swe/models)
+#                                     stay allowed.
+#   api.github.com /copilot_internal/ GET/HEAD get COPILOT_TOKEN instead of GH_PAT (token
+#                                     exchange, user/seat info, org custom instructions).
+#
+# Deliberately left denied: copilot-telemetry.githubusercontent.com, copilot-proxy.
+# githubusercontent.com, api.business.githubcopilot.com (no org seat), main.vscode-cdn.net.
+#
+# Exfil accounting: the request bodies here are not inspected, so this is an uninspected-content
+# channel to GitHub's Copilot service, like api.anthropic.com and the OpenAI hosts. What the
+# bump buys over a tunnel is the per-request log line and the /agents write deny.
+COPILOT_TOKEN = os.environ.get("COPILOT_TOKEN")  # host-side only; unset -> Copilot denied
+COPILOT_PLACEHOLDER = "github_pat_vmguard_placeholder_swapped_in_host_side"
+COPILOT_HOSTS = {"api.individual.githubcopilot.com", "api.githubcopilot.com"}
+COPILOT_AGENT_HOST = "api.githubcopilot.com"
+
 # ---- 4. handlers + dispatch ------------------------------------------------------------
 
 def _path_write_decision(flow, mo, label, **extra):
@@ -1236,6 +1272,15 @@ def _handle_github_api(flow):
     else denied."""
     m = flow.request.method
     path_only = flow.request.path.split("?", 1)[0]
+    if path_only.startswith("/copilot_internal/"):
+        # Copilot's own endpoints get the Copilot-only token, never GH_PAT (section 3b).
+        if m not in API_READ_METHODS:
+            return _deny(flow, "copilot_internal: non-read method denied", op="write")
+        if not COPILOT_TOKEN:
+            return _deny(flow, "copilot: no COPILOT_TOKEN configured host-side")
+        flow.request.headers["authorization"] = f"Bearer {COPILOT_TOKEN}"
+        _log("APIREAD", flow, copilot=True)
+        return
     if m in API_READ_METHODS:
         flow.request.headers["authorization"] = f"Bearer {PAT}"
         _log("APIREAD", flow)
@@ -1349,6 +1394,25 @@ def _handle_circleci(flow):
     # like when it was retried; it is NOT a gate (a green workflow may be rerun — NOTES 43).
     _log("WRITE", flow, project=slug, wf=wf, wf_status=status, rerun=True)
 
+def _handle_copilot(flow):
+    """Copilot inference hosts: every method through with the guest's placeholder swapped for
+    COPILOT_TOKEN, except writes to the coding agent's /agents API. See section 3b."""
+    if not COPILOT_TOKEN:
+        # Per-request deny, like CIRCLE_TOKEN: a missing optional token must not take the gate
+        # down. Fill COPILOT_TOKEN in /etc/vmguard/secrets.env, then restart.
+        return _deny(flow, "copilot: no COPILOT_TOKEN configured host-side")
+    path_only = flow.request.path.split("?", 1)[0]
+    if (flow.request.pretty_host == COPILOT_AGENT_HOST
+            and flow.request.method not in API_READ_METHODS
+            and (path_only == "/agents" or path_only.startswith("/agents/"))):
+        return _deny(flow, "copilot: coding-agent write denied", op="write")
+    auth = flow.request.headers.get("authorization", "")
+    if COPILOT_PLACEHOLDER in auth:
+        flow.request.headers["authorization"] = auth.replace(COPILOT_PLACEHOLDER, COPILOT_TOKEN)
+    # Its own kind, not READ/WRITE: every inference call is a POST, and logging those as WRITE
+    # would bury the GitHub/CircleCI writes that kind exists to audit.
+    _log("COPILOT", flow)
+
 def _handle_read_only(flow):
     """third-party read-only hosts: GET/HEAD allowed, no creds injected; writes denied — except
     the exact POST paths in READ_ONLY_POST_PATHS, which are logged as WRITE because their bodies
@@ -1378,6 +1442,7 @@ HOST_HANDLERS = {
     "github.com":          _handle_github_web,
     LAUNCHPAD_HOST:        _handle_launchpad,
     CIRCLE_HOST:           _handle_circleci,
+    **{h: _handle_copilot for h in COPILOT_HOSTS},
 }
 
 # A host in two tiers would silently get whichever the dispatch checks first, quietly
