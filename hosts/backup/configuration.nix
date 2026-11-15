@@ -154,6 +154,15 @@ in
       # including any Time Machine backups in the Backups share.
       "${nasMount}/**/.apps"
       "${nasMount}/**/.purge"
+      # Samba follows symlinks server-side, so over SMB they look like real
+      # directories. libvirt's test fixtures are fake sysfs trees full of
+      # node0 -> ../.. style links, which turn into an endless directory loop
+      # (stalled the first run for ~15h on 2026-11-14). Upstream tarball
+      # contents; nothing worth backing up.
+      "${nasMount}/**/libvirt-*/tests"
+      # AerynOS recipe checkouts (where the libvirt tree above lived); no
+      # longer used, and recoverable from GitHub anyway.
+      "${nasMount}/**/github.com/AerynOS"
     ];
     extraBackupArgs = [
       # SMB inode numbers aren't stable across mounts (and will change outright
