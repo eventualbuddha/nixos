@@ -122,7 +122,9 @@ in
       "noperm"
       "noauto"
       "x-systemd.automount"
-      "x-systemd.idle-timeout=10min"
+      # No idle-timeout: when it fired mid-backup (2026-11-15 09:53), systemd
+      # stopped restic-backups-nas (RequiresMountsFor) to unmount the share,
+      # killing the first run 1h in. The mount just stays up once used.
       "x-systemd.mount-timeout=30s"
       "_netdev"
     ];
