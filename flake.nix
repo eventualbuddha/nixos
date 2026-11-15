@@ -53,6 +53,10 @@
     # Declarative Flatpak installs and overrides, consumed through its
     # `nixosModules.nix-flatpak` from hosts/judy (Bambu Studio).
     nix-flatpak.url = "github:gmodena/nix-flatpak/?ref=v0.8.0";
+
+    # Hardware profiles for non-PC machines. `planb`, the backup Pi, uses its
+    # Raspberry Pi 4 firmware/boot profile (hosts/planb/hardware-configuration.nix).
+    nixos-hardware.url = "github:NixOS/nixos-hardware/master";
   };
 
   outputs =
@@ -91,11 +95,40 @@
             home-manager.nixosModules.default
           ];
         };
+
+      # A headless server host, not a desktop. Unlike mkHost it takes the
+      # system (planb is aarch64) and pulls in NEITHER the niri module NOR
+      # home-manager -- the host's own configuration.nix is self-contained and
+      # deliberately does not import hosts/common.nix (the desktop). Its Pi
+      # hardware profile comes from nixos-hardware, imported in the host's
+      # hardware-configuration.nix via `inputs`.
+      mkServer =
+        { name, system }:
+        nixpkgs.lib.nixosSystem {
+          inherit system;
+          specialArgs = { inherit inputs; };
+          modules = [ ./hosts/${name}/configuration.nix ];
+        };
     in
     {
       nixosConfigurations = {
         judy = mkHost "judy";
         work = mkHost "work";
+
+        # The offsite backup Pi. See hosts/planb and
+        # ~/Documents/remote-backup-planning/planb-setup.md.
+        planb = mkServer {
+          name = "planb";
+          system = "aarch64-linux";
+        };
+
+        # The backup client: an aarch64 UTM VM on the Mac Mini that reads the
+        # NAS and pushes to planb. Also the native aarch64 builder for planb.
+        # See ~/Documents/remote-backup-planning/backup-vm-setup.md.
+        backup = mkServer {
+          name = "backup";
+          system = "aarch64-linux";
+        };
       };
 
       # Standalone home-manager, for machines that are not NixOS. `vx` is the
