@@ -6,9 +6,9 @@
 #   rip main         rip the longest title
 #   rip all          rip every title over makemkvcon's minimum length
 #   rip eject        eject the disc
-#   rip backup       copy the whole disc, decrypted, to $RIP_DIR/<name>/backup/
+#   rip backup       copy the whole disc, decrypted, to $RIP_DIR/<name>/backup.iso
 #                    in one pass; after that, `rip` and `rip <#...>` with the
-#                    same RIP_NAME read the backup instead of the drive
+#                    same RIP_NAME read the image instead of the drive
 #
 # Backups are for slow or flaky discs: every `rip` invocation rescans the
 # disc (twice, with the info step), which on some box-set sides takes ~7 min
@@ -18,8 +18,9 @@
 #
 # makemkvcon reports "Operation successfully completed" even when titles
 # failed, so both rips and backups also check its output for read errors and
-# fail loudly. A failed backup is left as backup.partial/ (with its log), and
-# is never read from.
+# fail loudly. A failed backup is left as backup.iso.partial (with its log),
+# and is never read from. (makemkvcon 2.0's backup writes an ISO image, not a
+# VIDEO_TS/BDMV folder; it's read back as an iso: source.)
 #
 # Output goes to $RIP_DIR/<disc name>/ (default: the NAS's Videos/Rips), named
 # by makemkvcon (title_t03.mkv ...). Box sets often give every disc the same
@@ -93,8 +94,16 @@ makemkv_checked() { # <log> <args...>
   fi
 }
 
+# makemkvcon's backup takes only disc:<index>, not dev:<path>. A nonexistent
+# index lists the drives (DRV:<i>,...,"<model>","<label>","<device>") in a
+# few seconds without scanning any disc.
+disc_index() {
+  makemkvcon -r --cache=1 info disc:9999 2>/dev/null |
+    awk -F'"' -v dev="$DEVICE" '/^DRV:/ && $6 == dev { split($1, a, /[:,]/); print a[2]; exit }'
+}
+
 backup() {
-  local name info dest
+  local name info dest idx
   if [[ -n ${RIP_NAME:-} ]]; then
     name=$RIP_NAME
   else
@@ -103,12 +112,14 @@ backup() {
     name="$(disc_name "$info")"
   fi
   [[ $name != */* ]] || die "RIP_NAME can't contain slashes: '$name'"
-  dest="$RIP_DIR/$name/backup"
+  dest="$RIP_DIR/$name/backup.iso"
   [[ -e $dest ]] && die "already backed up: $dest"
   mkdir -p "$RIP_DIR/$name"
-  rm -rf "$dest.partial"
-  echo "rip: backing up $DEVICE -> $dest/"
-  makemkv_checked "$RIP_DIR/$name/backup.log" backup --decrypt "$SOURCE" "$dest.partial"
+  idx="$(disc_index)"
+  [[ -n $idx ]] || die "makemkvcon doesn't list a drive at $DEVICE"
+  rm -f "$dest.partial"
+  echo "rip: backing up $DEVICE (disc:$idx) -> $dest"
+  makemkv_checked "$RIP_DIR/$name/backup.log" backup --decrypt "disc:$idx" "$dest.partial"
   mv "$dest.partial" "$dest"
   echo "rip: backed up: $dest"
   echo "  RIP_NAME=\"$name\" rip      # list its titles (from the backup, not the drive)"
@@ -126,9 +137,9 @@ case "${1:-}" in
 esac
 
 # A backup made by `rip backup` stands in for the drive.
-if [[ -n ${RIP_NAME:-} && -d "$RIP_DIR/$RIP_NAME/backup" ]]; then
-  SOURCE="file:$RIP_DIR/$RIP_NAME/backup"
-  echo "rip: reading the backup, not the drive: $RIP_DIR/$RIP_NAME/backup/" >&2
+if [[ -n ${RIP_NAME:-} && -f "$RIP_DIR/$RIP_NAME/backup.iso" ]]; then
+  SOURCE="iso:$RIP_DIR/$RIP_NAME/backup.iso"
+  echo "rip: reading the backup, not the drive: $RIP_DIR/$RIP_NAME/backup.iso" >&2
 fi
 
 info="$(scan)"
