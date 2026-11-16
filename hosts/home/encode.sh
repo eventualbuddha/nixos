@@ -142,7 +142,9 @@ unit_for() { # <mode> <name> -> encode-tv-Project-Hail-Mary-2026
 }
 
 height() {
-  ffprobe -v error -select_streams v:0 -show_entries stream=height -of csv=p=0 "$1" | head -1
+  # default=nw=1:nk=1, not csv: some MKVs (DVD remuxes) print "480," as csv,
+  # and the trailing comma breaks every [[ $h -gt ... ]] below.
+  ffprobe -v error -select_streams v:0 -show_entries stream=height -of default=nw=1:nk=1 "$1" | head -1 | tr -cd '0-9'
 }
 
 # HandBrake's number (1-based) of the first audio track in LANGS, else 1.
