@@ -195,7 +195,7 @@ that `/var/backup/summer/summer.surql` is non-empty after the first run.
 sudo sbctl create-keys                       # into /var/lib/sbctl
 # hosts/home/configuration.nix: secureBoot = true;  then deploy from judy:
 nixos-rebuild switch --flake ~/nixos#home --target-host home --sudo
-sudo sbctl verify                            # everything in /boot signed
+sudo sbctl verify       # all signed except /boot/EFI/nixos/kernel-*: expected, lanzaboote's signed stub checks it by hash
 ```
 
 Reboot into firmware setup. Enable Secure Boot and put it in **Setup Mode**
@@ -226,3 +226,37 @@ rip eject
 ```
 
 When a disc needs the GUI, use `waypipe ssh home makemkv` from judy.
+
+## 8. Encoding and the Infuse library
+
+`Videos/` on the NAS is laid out for Infuse:
+
+| Folder | Infuse source on | Holds |
+|---|---|---|
+| `Movies/` | Apple TV | one copy of each film, the best one, as `Title (Year).ext` (flat, no per-film folders) |
+| `Mobile/` | iPad | one copy of each film small enough to download: hardlinks to `Movies/` files of 4 GB or less, plus separate encodes for the big ones |
+| `Rips/`, `.encoding/`, `REPLACED/` | none | raw MakeMKV output, encodes in progress, superseded copies |
+
+```sh
+encode tv   Rips/<disc>/<title>.mkv "Title (Year)"   # HEVC library copy -> Movies/
+encode file Rips/<disc>/<title>.mkv "Title (Year)"   # or keep the remux as is -> Movies/
+encode ipad Rips/<disc>/<title>.mkv "Title (Year)"   # iPad copy -> Mobile/ (for big films)
+encode status                                        # progress; they run as user units
+ENCODE_SAMPLE=60 encode tv ...                       # a 60 s test, left in .encoding/
+encode mobile-sync                                   # link anything new in Movies/ into Mobile/
+```
+
+`tv` and `file` run `mobile-sync` themselves. `mobile-sync` does its linking
+**on the NAS**, over ssh as root with `~/.ssh/readynas_sshfs`. Through the
+CIFS mount, `ln` fails for any name with a colon or question mark. On disk a
+`:` is either a literal colon or U+F022 (how macOS writes it); Samba shows
+both as the same name, and mobile-sync treats them as equal.
+
+2026-11-15 cleanup:
+- The Plex and Channels DVR ReadyNAS apps were purged along with their data:
+  `.apps/plexmediaserver`, `.apps/channels-dvr`, `Videos/channels-data` and
+  `Movies/Plex Versions`.
+- The 9 useful Plex "Optimized for TV" encodes became `Mobile/` copies, renamed
+  to match their `Movies/` names.
+- Smaller duplicate copies moved from `Movies/` to `Mobile/`.
+- Old .avi files that have a better .m4v moved to `REPLACED/`.

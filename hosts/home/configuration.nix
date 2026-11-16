@@ -23,10 +23,10 @@
 }:
 
 let
-  # Flip to true once the Secure Boot keys exist (`sudo sbctl create-keys`);
-  # see "Disk encryption / boot" below and step 6 of ./MIGRATION.md. Until then
-  # the box boots plain systemd-boot and unlocks with the passphrase.
-  secureBoot = false;
+  # On since 2026-11-15 (keys in /var/lib/sbctl, from `sudo sbctl create-keys`);
+  # see "Disk encryption / boot" below and step 6 of ./MIGRATION.md. To undo,
+  # set it false to go back to plain systemd-boot.
+  secureBoot = true;
 
   # The NAS's whole volume, read-write (unlike backup's read-only mount): rips
   # land on it. Bound to a name so the mount and the `rip` default can't drift.
@@ -42,6 +42,31 @@ let
     ];
     runtimeEnv.RIP_DIR_DEFAULT = "${nasMount}/Videos/Rips";
     text = builtins.readFile ./rip.sh;
+  };
+
+  # Headless HandBrake: the GUI would pull GTK onto a server. Not in the binary
+  # cache this way, so judy builds it (a few minutes) on nixpkgs bumps.
+  handbrake = pkgs.handbrake.override { useGtk = false; };
+
+  encode = pkgs.writeShellApplication {
+    name = "encode";
+    runtimeInputs = [
+      handbrake
+      pkgs.ffmpeg-headless # ffprobe
+      pkgs.coreutils
+      pkgs.gawk
+      pkgs.gnugrep
+      pkgs.gnused
+      pkgs.systemd
+      pkgs.openssh # mobile-sync runs its linking on the NAS
+    ];
+    runtimeEnv = {
+      VIDEOS_DEFAULT = "${nasMount}/Videos";
+      # With brian's ~/.ssh/readynas_sshfs key (carried over from Fedora, in
+      # home.tar; not in Nix).
+      NAS_SSH_DEFAULT = "root@192.168.86.35";
+    };
+    text = builtins.readFile ./encode.sh;
   };
 in
 {
@@ -115,6 +140,9 @@ in
     enable = true;
     pkiBundle = "/var/lib/sbctl";
     configurationLimit = 10;
+    # No kernel-cmdline editing at the boot menu (init=/bin/sh on a box that
+    # unlocks itself).
+    settings.editor = false;
   };
 
   # --- Networking ------------------------------------------------------------
@@ -290,6 +318,10 @@ in
     config.services.forgejo.package # `forgejo admin ...` (MIGRATION.md step 4)
     makemkv
     rip
+    encode
+    handbrake # HandBrakeCLI, for one-offs
+    pkgs.mkvtoolnix-cli # mkvinfo / mkvmerge: inspect and trim rips
+    pkgs.ffmpeg-headless # ffprobe
     waypipe # server side of `waypipe ssh home makemkv`
     cifs-utils
     sbctl # Secure Boot key management for lanzaboote
