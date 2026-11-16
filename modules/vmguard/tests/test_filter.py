@@ -1200,6 +1200,22 @@ check("cp65/telemetry_shut",      cop("/telemetry", "POST", host="copilot-teleme
 check("cp65/proxy_shut",          cop("/", host="copilot-proxy.githubusercontent.com")[0], "deny")
 check("cp65/business_shut",       cop("/models", host="api.business.githubcopilot.com")[0], "deny")
 check("cp65/device_login_shut",   cop("/login/device/code", "POST", host="github.com")[0], "deny")
+# ---- doc.rust-lang.org, www.githubstatus.com, plugins.dprint.dev (NOTES 66): read-only ----
+check("ro66/rustdoc_get",         gh("/stable/cargo/reference/resolver.html", "GET", host="doc.rust-lang.org"), "allow")
+check("ro66/rustdoc_post",        gh("/", "POST", host="doc.rust-lang.org"), "deny")
+check("ro66/rustdoc_no_creds",    hdrs("/stable/", "GET", "doc.rust-lang.org"), {})
+check("ro66/rust_docs_alias",     gh("/", "GET", host="docs.rust-lang.org"), "deny")
+check("ro66/ghstatus_get",        gh("/api/v2/status.json", "GET", host="www.githubstatus.com"), "allow")
+check("ro66/ghstatus_post",       gh("/api/v2/subscribers.json", "POST", host="www.githubstatus.com"), "deny")
+check("ro66/ghstatus_no_creds",   hdrs("/api/v2/summary.json", "GET", "www.githubstatus.com"), {})
+check("ro66/dprint_wasm",         gh("/typescript-0.96.1.wasm", "GET", host="plugins.dprint.dev"), "allow")
+check("ro66/dprint_scoped_wasm",  gh("/g-plane/pretty_yaml-v0.6.0.wasm", "GET", host="plugins.dprint.dev"), "allow")
+check("ro66/dprint_exec_json",    gh("/exec-0.5.1.json", "GET", host="plugins.dprint.dev"), "allow")
+check("ro66/dprint_exec_target",  gh("/dprint/dprint-plugin-exec/0.5.1/asset/plugin.json", "GET", host="plugins.dprint.dev"), "allow")
+check("ro66/dprint_head",         gh("/json-0.25.2.wasm", "HEAD", host="plugins.dprint.dev"), "allow")
+check("ro66/dprint_post",         gh("/", "POST", host="plugins.dprint.dev"), "deny")
+check("ro66/dprint_no_creds",     hdrs("/json-0.25.2.wasm", "GET", "plugins.dprint.dev"), {})
+check("ro66/dprint_other_sub",    gh("/", "GET", host="api.dprint.dev"), "deny")
 
 try:
     os.remove(os.environ["VMGUARD_DENYLOG"])

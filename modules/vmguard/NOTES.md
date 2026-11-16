@@ -1857,6 +1857,34 @@ needs doing, and how to back everything out.
     - Deploy: add `COPILOT_TOKEN` to `/etc/vmguard/secrets.env` on each host, then
       `./apply.sh` on `work` and `judy` (addon), then `./apply.sh` on vx (the placeholder),
       then open a new shell there.
+66. **`doc.rust-lang.org`, `plugins.dprint.dev`, `www.githubstatus.com` opened read-only
+    (2026-11-16, on request).** The user asked for the Rust docs and a sweep of the deny log
+    for other candidates. I swept 11-03 through 11-16, and the user picked these two from it.
+    - `doc.rust-lang.org`: one GET of `/stable/cargo/reference/resolver.html` (11-16 09:14). It's
+      in the item 31 doc-site tier. The user asked for "docs.rust-lang.org", but that host only
+      301s to `doc.rust-lang.org` and nothing requested it, so it stays denied (pinned).
+    - `plugins.dprint.dev`: 75 denied GETs on 11-15, dprint retrying its `json`, `markdown`,
+      `toml`, `typescript` and `g-plane/pretty_yaml` .wasm plugins and `exec-0.5.1.json`, so
+      formatting was broken. Checked from the host: the .wasm files answer 200 directly, and
+      the exec manifest 302s to `/dprint/dprint-plugin-exec/0.5.1/asset/plugin.json` on the
+      same host. That manifest names GitHub release zips plus a sha256 each, and the github
+      release hosts were already open, so one entry covers it.
+      **This admits executable code.** The wasm plugins run sandboxed inside dprint. The exec
+      plugin is a native binary whose checksum comes from this same host, so integrity is TLS
+      unless the repo's dprint config pins `@<checksum>` itself.
+    - `www.githubstatus.com`: three GETs of `/api/v2/status.json` and `summary.json` (11-05),
+      an agent checking for an outage. This is weak evidence, but it's harmless.
+    - GET/HEAD only, no credentials injected, writes denied, exact hosts (`api.dprint.dev` pinned
+      denied).
+    - **Swept and left shut:** datadog intake (8.5k POSTs) and `mcp-proxy.anthropic.com` plus
+      ~20 claude.ai MCP connector hosts (`mcp.slack.com`, `mcp.notion.com`, `*mcp.googleapis.com`,
+      …, ~58 POSTs each). These are exfil surfaces and stay blocked, as decided in item 8. The VS Code gallery/marketplace,
+      `exp-tas` and telemetry hosts stay shut per item 57. Copilot telemetry/proxy hosts are item 65's call; `gh.io/copilot-install`
+      wasn't asked for. `169.254.169.254` and `metadata.google.internal` are cloud metadata
+      probes. `tarballs.nixos.org` was a one-off nix fallback HEAD during the herdr fetch that
+      item 63 fixed. `releases.herdr.dev` and the apt-snapshots bucket denies predate items 63/64.
+    - Tests now 708 cases (+15).
+    - Deploy: `./apply.sh` on `work`, then on `judy`.
 
 ## Running it: `Justfile` (RETIRED)
 

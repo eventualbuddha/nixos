@@ -730,6 +730,10 @@ READ_ONLY_HOSTS = {"api.mason-registry.dev", "downloads.claude.ai", "herdr.dev",
                    # directly, not via a redirect. Separate from `herdr.dev` above because
                    # entries are exact hosts.
                    "releases.herdr.dev",
+                   # dprint's plugin registry (NOTES 66): the .wasm formatter plugins and the
+                   # exec plugin's manifest. The manifest 302s within this host, then names a
+                   # GitHub release zip plus its sha256 (github release hosts are open above).
+                   "plugins.dprint.dev",
                    # CI. `circleci.com` itself is NOT in this tier any more — it has its own
                    # handler (section 3a) because one endpoint on it takes a credential. Its
                    # reads are unchanged: GET/HEAD, no creds, exactly as this tier would give.
@@ -782,6 +786,11 @@ READ_ONLY_HOSTS = {"api.mason-registry.dev", "downloads.claude.ai", "herdr.dev",
                    # GitButler's docs + blog, both 403'd on a single GET each once `but` was in
                    # (NOTES 36). Predicted in NOTES 35 and now evidence, per the item 31 rule.
                    "docs.gitbutler.com", "blog.gitbutler.com",
+                   # Rust docs (NOTES 66): one GET of the cargo reference 403'd. `docs.rust-lang.org`
+                   # only 301s here, so only this exact name is listed.
+                   "doc.rust-lang.org",
+                   # GitHub's status page API, read by an agent checking for an outage (NOTES 66).
+                   "www.githubstatus.com",
 
                    # Claude Code's release bucket. `claude install` and the native build's own
                    # self-update fetch their tarballs from here, which is what makes the
