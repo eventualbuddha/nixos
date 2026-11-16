@@ -57,6 +57,20 @@
     # Hardware profiles for non-PC machines. `planb`, the backup Pi, uses its
     # Raspberry Pi 4 firmware/boot profile (hosts/planb/hardware-configuration.nix).
     nixos-hardware.url = "github:NixOS/nixos-hardware/master";
+
+    # Secure Boot for `home`: signs each generation's UKI with our own keys, so
+    # TPM2 (PCR 7) can unlock its LUKS root unattended. hosts/home only.
+    lanzaboote = {
+      url = "github:nix-community/lanzaboote";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # Declarative partitioning for `home`, which is what lets nixos-anywhere
+    # install it remotely. hosts/home/disko.nix.
+    disko = {
+      url = "github:nix-community/disko";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -128,6 +142,15 @@
         backup = mkServer {
           name = "backup";
           system = "aarch64-linux";
+        };
+
+        # The always-on box in the house: summer, Forgejo, the Blu-ray drive.
+        # Headless, but unlike planb/backup it also brings in home-manager (from
+        # its own configuration.nix) for home/core and its podman containers.
+        # See hosts/home/MIGRATION.md.
+        home = mkServer {
+          name = "home";
+          system = "x86_64-linux";
         };
       };
 
