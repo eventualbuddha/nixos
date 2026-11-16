@@ -24,7 +24,7 @@
 
 let
   # Flip to true once the Secure Boot keys exist (`sudo sbctl create-keys`);
-  # see "Disk encryption / boot" below and step 7 of ./MIGRATION.md. Until then
+  # see "Disk encryption / boot" below and step 6 of ./MIGRATION.md. Until then
   # the box boots plain systemd-boot and unlocks with the passphrase.
   secureBoot = false;
 
@@ -287,7 +287,7 @@ in
   boot.kernelModules = [ "sg" ];
 
   environment.systemPackages = with pkgs; [
-    config.services.forgejo.package # `forgejo admin ...` (MIGRATION.md step 5)
+    config.services.forgejo.package # `forgejo admin ...` (MIGRATION.md step 4)
     makemkv
     rip
     waypipe # server side of `waypipe ssh home makemkv`

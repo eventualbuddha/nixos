@@ -11,7 +11,7 @@
 #
 # The initial passphrase comes from /tmp/luks.key on the target, which
 # nixos-anywhere puts there (`--disk-encryption-keys /tmp/luks.key <local file>`).
-# It is only read at format time; TPM2 is enrolled later (MIGRATION.md step 7).
+# It is only read at format time; TPM2 is enrolled later (MIGRATION.md step 6).
 {
   disko.devices.disk.main = {
     type = "disk";
