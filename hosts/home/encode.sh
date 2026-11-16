@@ -9,7 +9,13 @@
 #                                         -> Mobile/Title (Year).mp4
 #   encode file <rip.mkv> "Title (Year)"  no encode: move the rip itself
 #                                         -> Movies/Title (Year).mkv
-#   encode status                         running encodes and progress; recent results
+#   encode episode <rip.mkv> "Show" S01E02 "Episode Title" [chapters]
+#                                         as tv, for a TV episode; chapters
+#                                         (e.g. 5-8) picks one episode out of
+#                                         a title that holds several
+#                                         -> TV/Show/Season 1/
+#                                            Show - S01E02 - Episode Title.mkv
+#   encode status                        running encodes and progress; recent results
 #   encode log                            HandBrake's log (journal)
 #   encode stop                           stop every running encode
 #   encode mobile-sync                    hardlink every Movies/ film of 4 GB or less
@@ -28,7 +34,11 @@
 # and `mobile-sync` catches up on anything added by hand. Links only get added:
 # renaming or deleting a Movies/ copy leaves its Mobile/ link as it was.
 #
-# tv and ipad run as transient systemd user units (encode-<mode>-<name>), so
+# TV/ is its own Infuse source on both devices; episodes are not linked into
+# Mobile/, which is films only. An SD (DVD) source is deinterlaced/detelecined
+# in every mode: HandBrake leaves combing in otherwise.
+#
+# tv, ipad and episode run as transient systemd user units (encode-<mode>-<name>), so
 # they survive logging out; linger keeps the user manager up. They write to
 # Videos/.encoding/ and are renamed into place only when finished, so Infuse
 # never sees a half-written file. Same share, so the rename is instant.
@@ -67,10 +77,11 @@ check_name() {
   [[ -n $1 && $1 != */* && $1 != .* ]] || die "name must be like \"Title (Year)\", no slashes: '$1'"
 }
 
-dest_for() { # <mode> <name>
+dest_for() { # <mode> <name> [show] [season]
   case $1 in
     tv | file) echo "$VIDEOS/Movies/$2.mkv" ;;
     ipad) echo "$VIDEOS/Mobile/$2.mp4" ;;
+    episode) echo "$VIDEOS/TV/$3/Season $4/$2.mkv" ;;
   esac
 }
 
@@ -147,9 +158,8 @@ note() { # one line into the history `encode status` shows
 
 # --- inside the unit ---------------------------------------------------------
 
-run() { # _run <mode> <src> <name>
-  local mode=$1 src=$2 name=$3 dest tmp progress h
-  dest=$(dest_for "$mode" "$name")
+run() { # _run <mode> <src> <name> <dest> [chapters]
+  local mode=$1 src=$2 name=$3 dest=$4 chapters=${5:-} tmp progress h
   tmp="$STAGE/$name.$mode.${dest##*.}"
   if [[ -n $SAMPLE ]]; then
     tmp="$STAGE/$name.$mode.sample.${dest##*.}"
@@ -160,7 +170,7 @@ run() { # _run <mode> <src> <name>
   h=$(height "$src")
   local -a args
   case $mode in
-    tv)
+    tv | episode)
       # RF 20 is near-transparent for 1080p; 4K holds up at 22.
       args=(--format av_mkv --markers
         -e x265_10bit --encoder-preset medium -q "$([[ $h -gt 1100 ]] && echo 22 || echo 20)"
@@ -191,6 +201,17 @@ run() { # _run <mode> <src> <name>
       fi
       ;;
   esac
+
+  # DVDs (480i/576i) are interlaced or telecined; film-sourced HD is not.
+  # detelecine restores 24p from 3:2 pulldown, and decomb deinterlaces only
+  # the frames that comb-detect flags, leaving progressive ones alone.
+  if [[ $h -le 576 ]]; then
+    args+=(--detelecine --comb-detect --decomb)
+  fi
+
+  if [[ -n $chapters ]]; then
+    args+=(--chapters "$chapters")
+  fi
 
   # Clean up a partial file however this ends (`encode stop` sends TERM).
   trap 'rm -f "$tmp"' EXIT
@@ -240,12 +261,24 @@ link_new() {
 
 # --- commands ----------------------------------------------------------------
 
-start() { # <mode> <src> <name>
-  local mode=$1 src name=$3 dest unit
+start() { # <mode> <src> <name>  |  episode <src> <show> <SxxEyy> <title> [chapters]
+  local mode=$1 src name=$3 dest unit chapters=""
   [[ -f $2 ]] || die "no such file: $2"
   src=$(readlink -f "$2")
-  check_name "$name"
-  dest=$(dest_for "$mode" "$name")
+  if [[ $mode == episode ]]; then
+    local show=$3 se=${4^^} title=$5 season
+    chapters=${6:-}
+    check_name "$show"
+    check_name "$title"
+    [[ $se =~ ^S([0-9]+)E[0-9]+(-?E[0-9]+)?$ ]] || die "episode must be like S01E02 (or S01E02-E03): '$4'"
+    season=$((10#${BASH_REMATCH[1]}))
+    [[ -z $chapters || $chapters =~ ^[0-9]+(-[0-9]+)?$ ]] || die "chapters must be like 5 or 5-8: '$chapters'"
+    name="$show - $se - $title"
+    dest=$(dest_for episode "$name" "$show" "$season")
+  else
+    check_name "$name"
+    dest=$(dest_for "$mode" "$name")
+  fi
   [[ -e $dest ]] && die "already exists: $dest"
 
   if [[ $mode == file ]]; then
@@ -264,7 +297,7 @@ start() { # <mode> <src> <name>
   systemd-run --user --quiet --collect --unit "$unit" \
     -p Nice=15 -p CPUSchedulingPolicy=batch -p IOSchedulingClass=idle \
     -E VIDEOS="$VIDEOS" -E ENCODE_LANGS="$LANGS" -E ENCODE_SAMPLE="$SAMPLE" \
-    -- "$(readlink -f "$0")" _run "$mode" "$src" "$name"
+    -- "$(readlink -f "$0")" _run "$mode" "$src" "$name" "$dest" "$chapters"
   if [[ -n $SAMPLE ]]; then
     echo "started $unit: ${SAMPLE}s sample -> $STAGE/"
   else
@@ -294,6 +327,10 @@ status() {
 case "${1:-}" in
   tv | ipad | file)
     [[ $# -eq 3 ]] || usage 1
+    start "$@"
+    ;;
+  episode)
+    [[ $# -eq 5 || $# -eq 6 ]] || usage 1
     start "$@"
     ;;
   _run)

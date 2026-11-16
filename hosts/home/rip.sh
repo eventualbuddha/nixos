@@ -8,9 +8,11 @@
 #   rip eject        eject the disc
 #
 # Output goes to $RIP_DIR/<disc name>/ (default: the NAS's Videos/Rips), named
-# by makemkvcon (title_t03.mkv ...). Renaming into Movies/ or TV/ is left to
-# you, on purpose: telling the feature from the decoy playlists some discs
-# carry, and which film it actually is, is the part automation gets wrong.
+# by makemkvcon (title_t03.mkv ...). Box sets often give every disc the same
+# label: RIP_NAME="Show S1D1A" rip ... picks the folder name instead.
+# Renaming into Movies/ or TV/ is left to you, on purpose: telling the feature
+# from the decoy playlists some discs carry, and which film it actually is, is
+# the part automation gets wrong.
 #
 # Packaged by configuration.nix (writeShellApplication adds `set -euo pipefail`
 # and puts makemkvcon/awk/eject on PATH).
@@ -73,7 +75,8 @@ if [[ -z "$table" ]]; then
   die "no titles found on $DEVICE"
 fi
 
-name="$(disc_name "$info")"
+name="${RIP_NAME:-$(disc_name "$info")}"
+[[ $name != */* ]] || die "RIP_NAME can't contain slashes: '$name'"
 main="$(longest <<<"$table")"
 
 if [[ $# -eq 0 ]]; then
@@ -93,6 +96,11 @@ if [[ $# -eq 0 ]]; then
 fi
 
 out="$RIP_DIR/$name"
+# makemkvcon names files by title number alone, so a second disc with the same
+# label would overwrite the first one's title_t00.mkv.
+if compgen -G "$out/*.mkv" >/dev/null; then
+  die "$out/ already has rips (another disc with this label?); set RIP_NAME"
+fi
 mkdir -p "$out"
 
 case "$1" in
