@@ -32,8 +32,8 @@
     sessionPath = [ "${config.home.homeDirectory}/.npm-global/bin" ];
   };
 
+  # v2 format; current podman rejects the old v1 `[registries.search]` table.
   xdg.configFile."containers/registries.conf".text = ''
-    [registries.search]
-    registries = ['docker.io', 'quay.io']
+    unqualified-search-registries = ['docker.io', 'quay.io']
   '';
 }
