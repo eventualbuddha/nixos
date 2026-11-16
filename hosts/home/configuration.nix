@@ -87,11 +87,11 @@ in
       "nix-command"
       "flakes"
     ];
-    # Accept closures pushed from judy (`nixos-rebuild --target-host`).
-    trusted-users = [
-      "root"
-      "@wheel"
-    ];
+    # Closures pushed from judy arrive as root (`--target-host root@home`).
+    # Not @wheel: a trusted user can add arbitrary store paths and set
+    # substituters, which is root by another name and would make sudo's
+    # password moot.
+    trusted-users = [ "root" ];
   };
 
   nix.gc = {
@@ -200,7 +200,9 @@ in
   users.users.root.openssh.authorizedKeys.keys =
     config.users.users.brian.openssh.authorizedKeys.keys;
 
-  security.sudo.wheelNeedsPassword = false; # access is gated by key-only SSH
+  # sudo asks for brian's password (set by hand with `passwd`; users are
+  # mutable). Deploys don't need it: they go in as root@home, whose key-only
+  # login above is also the way back in if sudo ever breaks.
 
   services.openssh.enable = true;
   services.openssh.settings = {

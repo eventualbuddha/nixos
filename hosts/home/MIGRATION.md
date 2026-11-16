@@ -194,7 +194,7 @@ that `/var/backup/summer/summer.surql` is non-empty after the first run.
 ```sh
 sudo sbctl create-keys                       # into /var/lib/sbctl
 # hosts/home/configuration.nix: secureBoot = true;  then deploy from judy:
-nixos-rebuild switch --flake ~/nixos#home --target-host home --sudo
+nixos-rebuild switch --flake ~/nixos#home --target-host root@home   # as root: sudo on home asks for a password
 sudo sbctl verify       # all signed except /boot/EFI/nixos/kernel-*: expected, lanzaboote's signed stub checks it by hash
 ```
 
