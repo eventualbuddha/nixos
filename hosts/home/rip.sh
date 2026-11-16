@@ -96,17 +96,26 @@ if [[ $# -eq 0 ]]; then
 fi
 
 out="$RIP_DIR/$name"
-# makemkvcon names files by title number alone, so a second disc with the same
-# label would overwrite the first one's title_t00.mkv.
-if compgen -G "$out/*.mkv" >/dev/null; then
-  die "$out/ already has rips (another disc with this label?); set RIP_NAME"
-fi
-mkdir -p "$out"
-
 case "$1" in
   main) set -- "$main" ;;
   all) set -- all ;;
 esac
+
+# makemkvcon names files <title name>_tNN.mkv by title number, so a second
+# disc with the same label would overwrite the first one's _t00. Refuse only
+# that collision: ripping a disc's titles one at a time into its folder is
+# fine.
+for t in "$@"; do
+  if [[ $t == all ]]; then
+    pat="$out/*.mkv"
+  else
+    pat="$out/*_t$(printf %02d "$t").mkv"
+  fi
+  if compgen -G "$pat" >/dev/null; then
+    die "$out/ already has a rip of title $t (another disc with this label?); set RIP_NAME"
+  fi
+done
+mkdir -p "$out"
 
 for t in "$@"; do
   if [[ "$t" != all ]] && ! cut -f1 <<<"$table" | grep -qx "$t"; then

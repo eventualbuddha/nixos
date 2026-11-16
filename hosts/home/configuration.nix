@@ -164,7 +164,12 @@ in
   # node keeps the name `home` and 100.86.205.11 and needs no `tailscale up`.
   # Tailscale SSH stays OFF (it was on under Fedora, and it is what broke
   # herdr): port 22 on the tailnet belongs to sshd, with keys below.
+  # Enforced, not assumed: the carried-over state still had RunSSH on, so
+  # `ssh home` was answered by tailscaled (banner SSH-2.0-Tailscale) and none
+  # of the sshd settings or authorized keys applied. tailscaled-set.service
+  # re-applies this on every switch.
   services.tailscale.enable = true;
+  services.tailscale.extraSetFlags = [ "--ssh=false" ];
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
   networking.firewall.allowedUDPPorts = [ config.services.tailscale.port ];
 
@@ -313,6 +318,20 @@ in
   # cdrom. The beta/purchased key goes in ~/.MakeMKV/settings.conf as
   # `app_Key = "..."` -- not here, it's a secret.
   boot.kernelModules = [ "sg" ];
+
+  # No blkid probe on optical media. udev's 60-persistent-storage.rules runs
+  # blkid on every disc change, and on a CSS DVD in the USB BD-RE drive those
+  # reads (sector 64, "critical target error") left the drive unable to open
+  # the disc until it was ejected -- mid-rip, several times. Known MakeMKV
+  # issue on Linux: https://forum.makemkv.com/forum/viewtopic.php?p=205692.
+  # systemd's rule honours this flag; it has to be set before 60-, which
+  # extraRules (99-local) is too late for. Cost: no ID_FS_LABEL on sr0, which
+  # `rip` doesn't use (it takes the name from makemkvcon).
+  services.udev.packages = [
+    (pkgs.writeTextDir "lib/udev/rules.d/59-no-blkid-optical.rules" ''
+      KERNEL=="sr*", ENV{UDEV_DISABLE_PERSISTENT_STORAGE_BLKID_FLAG}="1"
+    '')
+  ];
 
   environment.systemPackages = with pkgs; [
     config.services.forgejo.package # `forgejo admin ...` (MIGRATION.md step 4)
