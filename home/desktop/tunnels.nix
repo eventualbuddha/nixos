@@ -19,20 +19,24 @@
 # The one long-lived piece is `tunnel-frontend-master.service`, which holds a
 # single real SSH connection to vx and does nothing else; every `ssh -W` is a
 # plain client opening a channel over it. That split keeps a browser reconnect
-# from paying a full SSH handshake -- but the reason it's a separate unit
-# rather than `ControlMaster
-# auto` is that it keeps master setup and teardown out of the request path.
+# from paying a full SSH handshake -- and, since the identity that
+# authenticates to the guest is a touch-only YubiKey-backed key, from asking
+# for a touch. The reason it's a separate unit rather than `ControlMaster auto`
+# is that it keeps master setup and teardown out of the request path.
 #
-# Pulled in on demand by `tunnel-frontend@`'s `Wants=`, not started at login:
-# the identity that authenticates to the guest is a touch-only YubiKey-backed
-# key, and an eagerly-started master with `Restart=always` reconnects in the
-# background every time the SSH connection drops -- which suspend does every
-# time, on its own timer, with no browser tab open to explain it. That turned
-# into the YubiKey blinking for a touch ~30s after every resume, for a
-# connection nobody had asked to make yet. `StopWhenUnneeded` closes the loop:
-# once nothing wants it (the last forward exited), systemd stops it too,
-# instead of leaving it running to silently reconnect -- and prompt -- on some
-# later resume.
+# Pulled in on demand by `tunnel-frontend@`'s `Wants=`, not started at login,
+# and never restarted by systemd: a master that reconnects on its own does so
+# every time the SSH connection drops -- which suspend does every time, on its
+# own timer, with no browser tab open to explain it -- and that is the YubiKey
+# blinking for a touch ~30s after every resume, for a connection nobody had
+# asked to make yet. A dropped master stays down until the next request wants
+# it.
+#
+# It lingers for `ControlPersist` after its last forward rather than stopping
+# with it. Browser connections come and go -- a dev server restarting, a tab
+# going quiet, a guest-side port that refuses every connection while the
+# browser keeps retrying -- and a master that stopped the moment the last one
+# closed was a fresh handshake, and a fresh touch, on the very next request.
 #
 # When each forward could become the master itself, a request that arrived while
 # a master was expiring found the socket still on disk, connected to it, and got
@@ -66,27 +70,28 @@
       # master. ControlMaster=yes overrides the `no` in hosts/common.nix -- this
       # unit is the only thing that's allowed to create the socket.
       #
-      # ControlPersist=no keeps ssh in the foreground instead of forking a
-      # background master, so systemd is tracking the actual connection: the
-      # unit being active means the socket is real, and stopping the unit takes
-      # it down. ServerAlive* makes a wedged or vanished guest (a suspended VM,
-      # a dropped Tailscale route) show up as an exit within ~45s rather than a
-      # master that answers but can't open channels.
+      # -f with Type=forking is what makes the forwards' `After=` wait for a
+      # usable master: ssh forks into the background only once it has
+      # authenticated, so the unit stays "activating" through the YubiKey touch
+      # and every forward from a page load's burst of connections is held until
+      # the socket is there to use. If authentication fails, ssh exits before
+      # forking, the unit fails, and the forwards make direct connections.
+      #
+      # ControlPersist=5m is the idle timeout: the backgrounded master exits on
+      # its own five minutes after its last forward closes, and the unit goes
+      # inactive with it. ServerAlive* makes a wedged or vanished guest (a
+      # suspended VM, a dropped Tailscale route) show up as an exit within ~45s
+      # rather than a master that answers but can't open channels.
+      Type = "forking";
       ExecStart = toString [
-        "${pkgs.openssh}/bin/ssh -N"
+        "${pkgs.openssh}/bin/ssh -f -N"
         "-o ControlMaster=yes"
-        "-o ControlPersist=no"
+        "-o ControlPersist=5m"
         "-o ServerAliveInterval=15"
         "-o ServerAliveCountMax=3"
         "vx"
       ];
-      # The guest is a VM that's often simply off, and that's not an error worth
-      # escalating: the forwards work without a master, so this retries at a
-      # slow enough interval to stay out of the journal's way.
-      Restart = "always";
-      RestartSec = 30;
     };
-    Unit.StopWhenUnneeded = true;
   };
 
   systemd.user.services."tunnel-frontend@" = {

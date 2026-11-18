@@ -315,6 +315,29 @@ in
       Host vx-host.ts
         HostName 100.79.161.93
         User brian
+
+      # The Mac Mini (UTM host for the backup VM). Its tailnet name is still
+      # `vx-mini-2` from when it was a work machine, hence the alias.
+      Host mini
+        HostName 100.108.13.88
+        User donovan
+
+      # The machines that get deployed to and administered by hand, where a
+      # session is many short ssh/scp/rsync/nixos-rebuild connections in a row.
+      # Reusing one authenticated connection per host makes that one YubiKey
+      # touch rather than one per command. `backup`, `planb` and `home` resolve
+      # through MagicDNS, so they need no HostName.
+      #
+      # Named hosts only, never `Host *`: ssh_config is first-value-wins, so a
+      # catch-all `ControlMaster auto` here would beat the `ControlMaster no`
+      # that the `vx` block above depends on whenever it came first, and hand
+      # every browser connection to localhost:3000 its own master and its own
+      # touch.
+      Host mini backup planb home
+        ControlMaster auto
+        ControlPath ~/.ssh/cm-%r@%h:%p
+        ControlPersist 8h
+        ServerAliveInterval 30
     '';
   };
 
