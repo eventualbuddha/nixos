@@ -99,6 +99,15 @@ in
   # else here -- used only for the handful of things that need it.
   services.flatpak.enable = true;
 
+  # Keep systemd-tmpfiles' 10-day /tmp cleanup away from Chromium's (and so
+  # Helium's) process-singleton dirs. A browser left running for 10+ days
+  # otherwise has its /tmp/org.chromium.Chromium.*/SingletonCookie aged
+  # out; the next launch then sees a cookie mismatch, decides the running
+  # browser is gone, and starts a second one on the same profile -- which
+  # greets you with "didn't shut down correctly" and fights the first over
+  # the profile. `x` excludes the path (and its contents) from cleaning.
+  systemd.tmpfiles.rules = [ "x /tmp/org.chromium.Chromium.*" ];
+
   # virt-manager (libvirt/QEMU-KVM), for local VMs. OVMF (UEFI guest firmware)
   # ships by default now, no separate opt-in needed.
   virtualisation.libvirtd.enable = true;
