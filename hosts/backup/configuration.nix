@@ -141,16 +141,16 @@ in
   # trusted machine -- see planb-setup.md).
   #
   # Secrets (root-only, NOT in the nix store / git; escrow both in 1Password):
-  #   /root/restic/mac.pass  repo ENCRYPTION key. Lose it = lose the backup.
-  #   /root/restic/mac.env   RESTIC_REST_USERNAME=mac / RESTIC_REST_PASSWORD=...
+  #   /root/restic/nas.pass  repo ENCRYPTION key. Lose it = lose the backup.
+  #   /root/restic/nas.env   RESTIC_REST_USERNAME=nas / RESTIC_REST_PASSWORD=...
   #                          (planb's htpasswd credential; gates who may push).
   #
   # The first run moves ~6.4 TB and takes most of a day; start it by hand
   # (`systemctl start restic-backups-nas`) rather than waiting for the timer.
   services.restic.backups.nas = {
-    repository = "rest:http://planb:8000/mac/";
-    passwordFile = "/root/restic/mac.pass";
-    environmentFile = "/root/restic/mac.env";
+    repository = "rest:http://planb:8000/nas/";
+    passwordFile = "/root/restic/nas.pass";
+    environmentFile = "/root/restic/nas.env";
     initialize = true;
     paths = [ nasMount ];
     exclude = [
