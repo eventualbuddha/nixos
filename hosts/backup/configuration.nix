@@ -27,7 +27,10 @@ let
   nasMount = "/mnt/nas";
 in
 {
-  imports = [ ./hardware-configuration.nix ];
+  imports = [
+    ./hardware-configuration.nix
+    ../../modules/healthchecks.nix
+  ];
 
   networking.hostName = "backup";
 
@@ -181,6 +184,11 @@ in
   };
 
   systemd.services.restic-backups-nas.unitConfig.RequiresMountsFor = [ nasMount ];
+
+  # Dead man's switch (../../modules/healthchecks.nix). Check "nas -> planb":
+  # daily, grace 6h (incrementals can take 3h+). URL in
+  # /root/healthchecks/restic-backups-nas.url.
+  services.healthchecks-ping.restic-backups-nas = { };
 
   # --- Tooling ---------------------------------------------------------------
 

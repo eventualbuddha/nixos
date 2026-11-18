@@ -26,7 +26,10 @@ let
   resticData = "${backupMount}/restic";
 in
 {
-  imports = [ ./hardware-configuration.nix ];
+  imports = [
+    ./hardware-configuration.nix
+    ../../modules/healthchecks.nix
+  ];
 
   networking.hostName = "planb";
 
@@ -180,9 +183,9 @@ in
 
   # --- Health monitoring -----------------------------------------------------
 
-  # SMART monitoring of the archive drive. Alerting needs an MTA or a script;
-  # for now this logs to the journal and marks the drive FAILED there. Wire a
-  # healthchecks.io ping or ntfy push in planb-setup.md once the node is up.
+  # SMART monitoring of the archive drive. Logs to the journal only: the
+  # Seagate's USB bridge blocks SMART under UAS, so smartd can't see the drive
+  # yet and there's nothing useful to alert on (planb-setup.md).
   services.smartd = {
     enable = true;
     autodetect = true;
@@ -190,10 +193,9 @@ in
 
   # Monthly btrfs scrub: catches bit-rot on the archive drive (checksummed data,
   # so a scrub actually detects silent corruption rather than just reading it
-  # back). A real dead-man's-switch for "did a backup even run" belongs on the
-  # CLIENTS (ping healthchecks.io after a successful restic run) -- see
-  # planb-setup.md -- because planb is a passive target and can't know a client
-  # was supposed to call.
+  # back). The dead man's switch for "did a backup even run" is on the CLIENTS
+  # (backup, home), because planb is a passive target and can't know a client
+  # was supposed to call. planb reports only its own jobs, below.
   systemd.services.btrfs-scrub-backup = {
     description = "Scrub the backup btrfs filesystem";
     serviceConfig = {
@@ -207,6 +209,38 @@ in
     timerConfig = {
       OnCalendar = "monthly";
       Persistent = true;
+    };
+  };
+
+  # Dead man's switch for planb itself (../../modules/healthchecks.nix).
+  #   btrfs-scrub-backup  check "planb scrub": monthly, grace 2 days. A scrub
+  #                       that finds errors exits non-zero -> fail ping.
+  #   planb-heartbeat     check "planb alive": every 15 min, grace 1h. Catches
+  #                       "planb is unplugged / offline at the remote site"
+  #                       within an hour, instead of at the next missed backup.
+  # URLs in /root/healthchecks/<service>.url.
+  services.healthchecks-ping = {
+    btrfs-scrub-backup = { };
+    planb-heartbeat = { };
+  };
+
+  systemd.services.planb-heartbeat = {
+    description = "Heartbeat ping to healthchecks.io";
+    # The ping itself is the module's ExecStopPost; the unit just has to run.
+    # It also fails (-> fail ping) if the backup drive isn't mounted, so
+    # "planb up but drive gone" shows as down too.
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${pkgs.util-linux}/bin/mountpoint -q ${backupMount}";
+    };
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+  };
+  systemd.timers.planb-heartbeat = {
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnBootSec = "2min";
+      OnUnitActiveSec = "15min";
     };
   };
 

@@ -73,6 +73,7 @@ in
   imports = [
     ./hardware-configuration.nix
     ./disko.nix
+    ../../modules/healthchecks.nix
     inputs.disko.nixosModules.disko
     inputs.home-manager.nixosModules.default
     inputs.lanzaboote.nixosModules.lanzaboote
@@ -395,6 +396,10 @@ in
       Persistent = true;
     };
   };
+
+  # Dead man's switch (../../modules/healthchecks.nix). Check "home -> planb":
+  # daily, grace 4h. URL in /root/healthchecks/restic-backups-home.url.
+  services.healthchecks-ping.restic-backups-home = { };
 
   # First install of this host. Do not bump on upgrades.
   system.stateVersion = "26.05";
