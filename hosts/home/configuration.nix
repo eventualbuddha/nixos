@@ -12,7 +12,9 @@
 # power cut. Every choice below that bears on that is marked "unattended".
 #
 # Deploy from judy:
-#   nixos-rebuild switch --flake ~/nixos#home --target-host home --sudo
+#   nixos-rebuild switch --flake ~/nixos#home --target-host root@home
+# As root, not `--target-host home --sudo`: only root may push unsigned store
+# paths here (trusted-users below).
 
 {
   config,
@@ -148,8 +150,12 @@ in
 
   # --- Networking ------------------------------------------------------------
 
-  # Wired (I219-V) on DHCP. The Wi-Fi card is left unconfigured.
-  networking.useDHCP = lib.mkDefault true;
+  # NetworkManager, for Wi-Fi. The network and its password are not in this
+  # repo: join once on the box with `sudo nmcli dev wifi connect <SSID>
+  # password <pw>`, which saves a system-wide profile under
+  # /etc/NetworkManager/system-connections that autoconnects at boot with no
+  # login (unattended). The wired port (I219-V) still gets DHCP if plugged in.
+  networking.networkmanager.enable = true;
 
   # Nothing on a plain NixOS server pulls in network-online.target, but
   # podman's user units (podman-user-wait-network-online) poll for it: without
