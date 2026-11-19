@@ -34,6 +34,13 @@ let
   helium = pkgs.appimageTools.wrapType2 {
     pname = "helium";
     inherit version;
+    # buildFHSEnv's default `bwrap --die-with-parent` SIGKILLs the sandbox
+    # when whatever exec'd `helium` exits. Launchers that fire and forget --
+    # niri's double-forking `spawn`, xdg-open, the app launcher -- exit right
+    # away, so a launch would intermittently die before it either started the
+    # browser or handed off to the running one: Super+B "did nothing" about a
+    # third of the time. A browser should outlive whatever launched it anyway.
+    dieWithParent = false;
     src = pkgs.fetchurl {
       url = "https://github.com/imputnet/helium-linux/releases/download/${version}/helium-${version}-x86_64.AppImage";
       sha256 = "1psgyij2jdqcjvbxfca1w6nkp0wjxdqny635ya29b2a8z0cq8cgv";
