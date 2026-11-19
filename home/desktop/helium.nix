@@ -41,6 +41,15 @@ let
     # browser or handed off to the running one: Super+B "did nothing" about a
     # third of the time. A browser should outlive whatever launched it anyway.
     dieWithParent = false;
+    # The AppImage's AppRun exports CHROME_WRAPPER="${APPIMAGE:-<itself>}",
+    # and Chromium writes CHROME_WRAPPER into the Exec= line of the .desktop
+    # files it creates for installed web apps (PWAs). With no $APPIMAGE that
+    # is the bare AppRun in the store, which can't find its libraries outside
+    # this FHS sandbox (and would go stale on the next bump anyway). Point it
+    # at the profile's stable `helium` wrapper instead.
+    extraBwrapArgs = [
+      "--setenv APPIMAGE ${config.home.profileDirectory}/bin/helium"
+    ];
     src = pkgs.fetchurl {
       url = "https://github.com/imputnet/helium-linux/releases/download/${version}/helium-${version}-x86_64.AppImage";
       sha256 = "1psgyij2jdqcjvbxfca1w6nkp0wjxdqny635ya29b2a8z0cq8cgv";
